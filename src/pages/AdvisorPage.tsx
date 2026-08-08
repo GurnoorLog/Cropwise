@@ -383,9 +383,17 @@ export default function AdvisorPage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-8 py-6 flex justify-between items-center">
-        <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
-          Harvest Window
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
+            Harvest Window
+          </Link>
+          <Link
+            to="/news"
+            className="hidden md:inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold uppercase tracking-wider bg-white/10 border border-white/10 text-white/80 hover:bg-white hover:text-black transition-all"
+          >
+            Forecasts
+          </Link>
+        </div>
         <div className="flex items-center gap-4">
           <button
             onClick={toggleLanguage}
