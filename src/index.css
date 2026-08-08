@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-heading: "Inter", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", "Noto Serif Devanagari", ui-serif, Georgia, serif;
+
+  /* Earthy Greens & Warm Tones */
+  --color-primary: oklch(0.52 0.13 145);
+  --color-on-primary: oklch(1.0 0 0);
+  --color-secondary: oklch(0.40 0.11 150);
+  --color-accent: oklch(0.74 0.16 80);
+  --color-background: oklch(0.98 0.02 95);
+  --color-foreground: oklch(0.27 0.04 70);
+  --color-muted: oklch(0.96 0.02 92);
+  --color-border: oklch(0.88 0.04 85);
+  --color-destructive: oklch(0.52 0.18 25);
+  --color-ring: oklch(0.52 0.13 145);
+  --color-success: oklch(0.55 0.15 145);
+  --color-warning: oklch(0.65 0.16 75);
+  --color-card: oklch(1.0 0 0);
+}
+
+/* Base styles for CropWise */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Mic pulse animation */
+@keyframes mic-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 oklch(0.52 0.13 145 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 20px oklch(0.52 0.13 145 / 0);
+  }
+}
+
+.animate-mic-pulse {
+  animation: mic-pulse 2s ease-in-out infinite;
+}
+
+/* Fade in up */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 400ms ease-out forwards;
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin 1.5s linear infinite;
+}
+
+/* ===== Landing page (Premium Editorial) ===== */
+
+/* Serif hero heading — matches the landing design */
+.hero-heading {
+  font-size: 80px;
+  line-height: 0.95;
+  letter-spacing: -2.46px;
+}
+
+@media (max-width: 768px) {
+  .hero-heading {
+    font-size: 48px;
+  }
+}
+
+/* Entrance animation with staggered delays */
+.fade-rise {
+  opacity: 0;
+  animation: fadeRise 0.8s ease-out forwards;
+}
+
+@keyframes fadeRise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-1 { animation-delay: 0s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.4s; }
+.stagger-4 { animation-delay: 0.6s; }
+
+.pill-button {
+  transition: transform 0.3s ease-in-out;
+}
+
+.pill-button:hover {
+  transform: scale(1.03);
+}
+
+/* Dark scrim over the hero video */
+.video-overlay {
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.4), rgba(15, 23, 42, 0.7));
+}
+
+/* Heavier scrim used on the dashboard / settings pages */
+.video-overlay-dashboard {
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.95));
+}
+
+/* Dashboard glass cards */
+.card-glass {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-glass:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Chart area wash */
+.chart-gradient {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-mic-pulse,
+  .animate-fade-in-up,
+  .animate-spin-slow,
+  .fade-rise {
+    animation: none;
+  }
+}
