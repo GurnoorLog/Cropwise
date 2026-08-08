@@ -12,7 +12,15 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
-import { getApiKeys, setApiKey, maskKey, type ApiKeyName } from "../lib/apiKeys";
+import {
+  getApiKeys,
+  getStoredApiKeys,
+  getApiKeySource,
+  setApiKey,
+  maskKey,
+  type ApiKeyName,
+  type ApiKeySource,
+} from "../lib/apiKeys";
 
 interface IntegrationCardProps {
   id: ApiKeyName;
@@ -20,7 +28,9 @@ interface IntegrationCardProps {
   iconBg: string;
   title: string;
   description: string;
-  savedValue: string;
+  storedValue: string;
+  effectiveValue: string;
+  source: ApiKeySource;
   placeholder: string;
   onSaved: (name: ApiKeyName, value: string) => void;
 }
@@ -31,7 +41,9 @@ function IntegrationCard({
   iconBg,
   title,
   description,
-  savedValue,
+  storedValue,
+  effectiveValue,
+  source,
   placeholder,
   onSaved,
 }: IntegrationCardProps) {
@@ -39,8 +51,9 @@ function IntegrationCard({
   const [show, setShow] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
-  const hasSaved = savedValue.length > 0;
-  const displayValue = hasSaved ? maskKey(savedValue) : "";
+  const hasStored = storedValue.length > 0;
+  const fromEnv = source === "env";
+  const configured = hasStored || fromEnv;
 
   const handleSave = () => {
     const trimmed = value.trim();
@@ -57,6 +70,13 @@ function IntegrationCard({
     setValue("");
   };
 
+  const statusLabel = hasStored ? "Configured" : fromEnv ? "Configured · env" : "Not set";
+  const statusClass = configured
+    ? hasStored
+      ? "bg-green-100 text-green-700"
+      : "bg-sky-100 text-sky-700"
+    : "bg-slate-100 text-slate-500";
+
   return (
     <div className="card-glass p-8 fade-rise stagger-1">
       <div className="flex items-start gap-4 mb-6">
@@ -68,24 +88,31 @@ function IntegrationCard({
           <p className="text-xs text-slate-500 leading-relaxed mt-1">{description}</p>
         </div>
         <span
-          className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-widest ${
-            hasSaved ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"
-          }`}
+          className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-widest ${statusClass}`}
         >
-          {hasSaved ? "Configured" : "Not set"}
+          {statusLabel}
         </span>
       </div>
 
-      {hasSaved && (
+      {configured && (
         <div className="flex items-center justify-between mb-4 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200">
-          <p className="text-sm font-mono text-slate-600 truncate">{displayValue}</p>
-          <button
-            onClick={handleClear}
-            aria-label={`Remove ${title} key`}
-            className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="min-w-0">
+            <p className="text-sm font-mono text-slate-600 truncate">
+              {maskKey(effectiveValue)}
+            </p>
+            <p className="text-[10px] text-slate-400 font-medium">
+              {hasStored ? "Stored in this browser" : "From environment (Vercel)"}
+            </p>
+          </div>
+          {hasStored && (
+            <button
+              onClick={handleClear}
+              aria-label={`Remove ${title} key`}
+              className="ml-3 shrink-0 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 
@@ -118,7 +145,11 @@ function IntegrationCard({
         </button>
       </div>
       <p className="text-[11px] text-slate-400 mt-3">
-        Stored only in this browser. Clear it to fall back to the Supabase Edge Function.
+        {hasStored
+          ? "Stored only in this browser. Remove it to fall back to the environment key."
+          : fromEnv
+            ? "Set from the environment (Vercel). Enter one here to override it for this browser."
+            : "No key set. The Advisor will fall back to the Supabase Edge Function."}
       </p>
     </div>
   );
@@ -127,9 +158,11 @@ function IntegrationCard({
 export default function ApiKeysPage() {
   const { user, signOut } = useAuth();
   const [keys, setKeys] = useState(getApiKeys);
+  const [stored, setStored] = useState(getStoredApiKeys);
 
   const handleSave = (name: ApiKeyName, value: string) => {
     setKeys(setApiKey(name, value));
+    setStored(getStoredApiKeys());
   };
 
   const fullName = (user?.user_metadata?.full_name as string) ?? user?.email ?? "Farmer";
@@ -210,7 +243,8 @@ export default function ApiKeysPage() {
           <h1 className="font-serif text-4xl text-white mb-2">Integrations & API Keys</h1>
           <p className="text-white/50 font-light max-w-xl">
             Enter the API keys that power the Advisor — voice transcription and AI
-            recommendations — so the app works directly from the browser.
+            recommendations — so the app works directly from the browser. Keys can also be
+            set per deployment via environment variables.
           </p>
         </header>
 
@@ -221,7 +255,9 @@ export default function ApiKeysPage() {
             iconBg="bg-sky-50 text-sky-600"
             title="Speechmatics"
             description="Voice transcription. Your API key is used to mint a real-time token for the microphone flow."
-            savedValue={keys.speechmatics}
+            storedValue={stored.speechmatics}
+            effectiveValue={keys.speechmatics}
+            source={getApiKeySource("speechmatics")}
             placeholder="Enter your Speechmatics API key"
             onSaved={handleSave}
           />
@@ -231,7 +267,9 @@ export default function ApiKeysPage() {
             iconBg="bg-violet-50 text-violet-600"
             title="AI/ML API"
             description="Market recommendations. Your key is used to call the AI/ML API (OpenAI-compatible) for crop advice and buyer messages."
-            savedValue={keys.ai}
+            storedValue={stored.ai}
+            effectiveValue={keys.ai}
+            source={getApiKeySource("ai")}
             placeholder="Enter your AI/ML API key"
             onSaved={handleSave}
           />

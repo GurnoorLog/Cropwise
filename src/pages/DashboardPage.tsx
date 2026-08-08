@@ -5,7 +5,6 @@ import {
   TrendingUp,
   CloudLightning,
   Calendar,
-  LogOut,
   Sprout,
   KeyRound,
 } from "lucide-react";
@@ -57,7 +56,7 @@ function getInitials(name: string): string {
 }
 
 export default function DashboardPage() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const fullName = (user?.user_metadata?.full_name as string) ?? user?.email ?? "Farmer";
   const displayName = user?.user_metadata?.full_name
     ? (user.user_metadata.full_name as string).split(" ")[0]
@@ -89,13 +88,13 @@ export default function DashboardPage() {
             </Link>
             <div className="hidden md:flex gap-6">
               <Link to="/dashboard" className={navLink(true)}>
-                Dashboard
+                Overview
               </Link>
               <Link to="/app" className={navLink(false)}>
-                Advisor
+                Forecasts
               </Link>
-              <Link to="/settings" className={navLink(false)}>
-                API Keys
+              <Link to="/app" className={navLink(false)}>
+                Buyers
               </Link>
             </div>
           </div>
@@ -115,13 +114,6 @@ export default function DashboardPage() {
               <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/20 flex items-center justify-center text-white font-bold text-sm">
                 {initials}
               </div>
-              <button
-                onClick={signOut}
-                aria-label="Sign out"
-                className="text-white/40 hover:text-white transition-colors cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           </div>
         </div>
