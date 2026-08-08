@@ -32,6 +32,21 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Thin scrollbar (matches premium dashboard design) */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
 }
 
 /* Focus ring */
@@ -155,12 +170,144 @@ body {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0) 100%);
 }
 
+/* ===== News & Insights (Premium Editorial) ===== */
+
+/* News card — matches the news design */
+.news-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.news-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Filter pills (news nav) */
+.filter-tab {
+  transition: all 0.2s ease;
+}
+
+.filter-tab.active {
+  background: #000;
+  color: #fff;
+}
+
+/* Lighter scrim used on the news page */
+.video-overlay-news {
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.9));
+}
+
+/* ===== Voice Agent (Premium) ===== */
+
+/* Radial scrim over the video for the voice agent */
+.video-overlay-voice {
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%);
+}
+
+/* Waveform bars flanking the mic button */
+.waveform-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: #00d084;
+  animation: waveHeight 1.2s ease-in-out infinite alternate;
+}
+
+.waveform-bar:nth-child(2) {
+  animation-delay: 0.1s;
+  height: 20px;
+}
+
+.waveform-bar:nth-child(3) {
+  animation-delay: 0.2s;
+  height: 35px;
+}
+
+.waveform-bar:nth-child(4) {
+  animation-delay: 0.3s;
+  height: 15px;
+}
+
+.waveform-bar:nth-child(5) {
+  animation-delay: 0.4s;
+  height: 40px;
+}
+
+.waveform-bar:nth-child(6) {
+  animation-delay: 0.5s;
+  height: 25px;
+}
+
+@keyframes waveHeight {
+  from {
+    height: 10px;
+  }
+  to {
+    height: 50px;
+  }
+}
+
+/* Mic glow pulse */
+.mic-pulse {
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 208, 132, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 20px rgba(0, 208, 132, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 208, 132, 0);
+  }
+}
+
+/* Voice agent mic states */
+.state-listening {
+  background-color: #00d084;
+}
+
+.state-processing {
+  background-color: #f59e0b;
+}
+
+.state-speaking {
+  background-color: #3b82f6;
+}
+
+.state-idle {
+  background-color: #000;
+}
+
+/* Status dot pulse */
+.dot-pulse {
+  animation: opacityPulse 1s infinite alternate;
+}
+
+@keyframes opacityPulse {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .animate-mic-pulse,
   .animate-fade-in-up,
   .animate-spin-slow,
-  .fade-rise {
+  .fade-rise,
+  .waveform-bar,
+  .mic-pulse,
+  .dot-pulse {
     animation: none;
   }
 }

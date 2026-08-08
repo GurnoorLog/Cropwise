@@ -7,6 +7,7 @@ import {
   Calendar,
   Sprout,
   KeyRound,
+  Newspaper,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 
@@ -90,10 +91,10 @@ export default function DashboardPage() {
               <Link to="/dashboard" className={navLink(true)}>
                 Overview
               </Link>
-              <Link to="/app" className={navLink(false)}>
+              <Link to="/news" className={navLink(false)}>
                 Forecasts
               </Link>
-              <Link to="/app" className={navLink(false)}>
+              <Link to="/news" className={navLink(false)}>
                 Buyers
               </Link>
             </div>
@@ -228,7 +229,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <Link
-                  to="/app"
+                  to="/news"
                   className="w-full py-4 rounded-xl border border-white/20 text-center text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all"
                 >
                   View Full Forecast
@@ -260,9 +261,12 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-              <button className="w-full mt-8 py-4 rounded-xl bg-slate-50 text-slate-900 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer">
+              <Link
+                to="/news"
+                className="block w-full mt-8 py-4 rounded-xl bg-slate-50 text-slate-900 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer text-center"
+              >
                 View All Buyers
-              </button>
+              </Link>
             </div>
           </div>
         </div>
@@ -297,6 +301,10 @@ export default function DashboardPage() {
           <Sprout className="w-4 h-4" />
           <Link to="/app" className="text-sm hover:text-white transition-colors">
             Advisor
+          </Link>
+          <Newspaper className="w-4 h-4" />
+          <Link to="/news" className="text-sm hover:text-white transition-colors">
+            News
           </Link>
           <KeyRound className="w-4 h-4" />
           <Link to="/settings" className="text-sm hover:text-white transition-colors">

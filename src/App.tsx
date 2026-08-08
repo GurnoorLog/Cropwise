@@ -13,6 +13,7 @@ import LandingPage from "./components/LandingPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
 import AdvisorPage from "./pages/AdvisorPage";
 import DashboardPage from "./pages/DashboardPage";
+import NewsPage from "./pages/NewsPage";
 import ApiKeysPage from "./pages/ApiKeysPage";
 import { Loader2 } from "lucide-react";
 
@@ -50,6 +51,14 @@ function AppRoutes() {
         element={
           <Protected>
             <DashboardPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/news"
+        element={
+          <Protected>
+            <NewsPage />
           </Protected>
         }
       />

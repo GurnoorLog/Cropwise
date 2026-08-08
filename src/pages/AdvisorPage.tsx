@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Mic, Settings, X, Languages, LogOut, RefreshCw, Volume2, Keyboard } from "lucide-react";
 
 import { supabase } from "../supabase";
 import { useAuth } from "../lib/auth";
@@ -7,22 +8,42 @@ import { getApiKey } from "../lib/apiKeys";
 import { useSpeechmatics } from "../hooks/useSpeechmatics";
 import { useTTS } from "../hooks/useTTS";
 import { getAdjustedPrices, formatPrices } from "../data/prices";
-import MicButton from "../components/MicButton";
 import TextInput from "../components/TextInput";
-import ResponseCard, { type AIResponse } from "../components/ResponseCard";
-import {
-  Sprout,
-  Languages,
-  AlertTriangle,
-  LayoutDashboard,
-  KeyRound,
-  LogOut,
-} from "lucide-react";
+import type { AIResponse } from "../components/ResponseCard";
 
 type AdvisorStep = "idle" | "recording" | "connecting" | "thinking" | "result" | "error";
 
+type AgentState = "listening" | "processing" | "speaking" | "ready";
+
 const AI_MODEL = "gpt-4o-mini";
 const AI_ENDPOINT = "https://api.aimlapi.com/v1/chat/completions";
+
+const SUGGESTIONS = [
+  "Market Prices",
+  "Weather Forecast",
+  "Buyer Opportunities",
+] as const;
+
+const STATE_LABEL: Record<AgentState, string> = {
+  listening: "Listening...",
+  processing: "Processing...",
+  speaking: "Speaking...",
+  ready: "Ready",
+};
+
+const STATE_DOT: Record<AgentState, string> = {
+  listening: "#00d084",
+  processing: "#f59e0b",
+  speaking: "#3b82f6",
+  ready: "#4b5563",
+};
+
+const STATE_CLASS: Record<AgentState, string> = {
+  listening: "state-listening",
+  processing: "state-processing",
+  speaking: "state-speaking",
+  ready: "state-idle",
+};
 
 /** Call the AI/ML API directly from the browser using a user-provided key */
 async function callAIMLDirect(opts: {
@@ -96,13 +117,21 @@ export default function AdvisorPage() {
   const [interimText, setInterimText] = useState("");
   const [finalText, setFinalText] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
-  const [micBlocked, setMicBlocked] = useState(false);
 
   const { user, signOut } = useAuth();
   const weatherRef = useRef<any>(null);
   const queryRef = useRef("");
 
   const { speak, isSpeaking } = useTTS({ language });
+
+  const agentState: AgentState =
+    step === "recording"
+      ? "listening"
+      : step === "connecting" || step === "thinking"
+        ? "processing"
+        : step === "result" && isSpeaking
+          ? "speaking"
+          : "ready";
 
   const handleFinalTranscript = useCallback((text: string) => {
     setFinalText(text);
@@ -263,6 +292,13 @@ export default function AdvisorPage() {
 
   /** Handle mic button tap */
   const handleMicTap = useCallback(async () => {
+    if (step === "result" || step === "error") {
+      setStep("idle");
+      setResponse(null);
+      setErrorMessage("");
+      return;
+    }
+
     if (isRecording) {
       await stopRecording();
       return;
@@ -276,12 +312,10 @@ export default function AdvisorPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
 
-      setMicBlocked(false);
       setStep("recording");
       await startRecording();
     } catch (err: any) {
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        setMicBlocked(true);
         setShowTextInput(true);
         setErrorMessage(
           language === "hi" ? "माइक की अनुमति नहीं मिली। नीचे टाइप करें।" : "Mic access denied. Type below.",
@@ -291,7 +325,7 @@ export default function AdvisorPage() {
       }
       setStep("error");
     }
-  }, [isRecording, startRecording, stopRecording, language]);
+  }, [isRecording, startRecording, stopRecording, language, step]);
 
   /** Handle text submit */
   const handleTextSubmit = useCallback(
@@ -315,178 +349,243 @@ export default function AdvisorPage() {
     setErrorMessage("");
     setInterimText("");
     setFinalText("");
+    setShowTextInput(false);
     weatherRef.current = null;
     window.speechSynthesis.cancel();
   }, []);
 
-  const navLink =
-    "inline-flex items-center gap-1.5 text-sm font-medium text-foreground/50 hover:text-foreground transition-colors";
+  const iconButton =
+    "p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer text-white/60 hover:text-white";
+
+  const micIcon =
+    step === "connecting" || step === "thinking" ? (
+      <RefreshCw className="w-16 h-16 animate-spin-slow" />
+    ) : step === "result" && isSpeaking ? (
+      <Volume2 className="w-16 h-16" />
+    ) : (
+      <Mic className="w-16 h-16" />
+    );
+
+  const showWaveform = step === "recording" || step === "connecting" || step === "thinking";
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center gap-2">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <Sprout className="w-7 h-7 text-primary" />
-            <h1 className="text-xl font-bold text-foreground tracking-tight">Harvest Window</h1>
-          </Link>
-        </div>
+    <div className="min-h-screen relative flex flex-col items-center justify-center isolate overflow-hidden bg-[hsl(201,100%,13%)]">
+      {/* Background Video Layer */}
+      <div className="fixed inset-0 w-full h-full -z-20 overflow-hidden">
+        <video autoPlay muted loop playsInline className="w-full h-full object-cover">
+          <source
+            src="https://designerstephen.github.io/public-assets/videos/serene-art-hero.mp4"
+            type="video/mp4"
+          />
+        </video>
+        <div className="absolute inset-0 video-overlay-voice" />
+      </div>
 
-        <nav className="hidden md:flex items-center gap-5">
-          <Link to="/dashboard" className={navLink}>
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
-          </Link>
-          <Link to="/app" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-            <Sprout className="w-4 h-4" /> Advisor
-          </Link>
-          <Link to="/settings" className={navLink}>
-            <KeyRound className="w-4 h-4" /> API Keys
-          </Link>
-        </nav>
-
-        <div className="flex items-center gap-2">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 px-8 py-6 flex justify-between items-center">
+        <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
+          Harvest Window
+        </Link>
+        <div className="flex items-center gap-4">
           <button
             onClick={toggleLanguage}
             aria-label={`Switch to ${language === "hi" ? "English" : "Hindi"}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted border border-border text-sm font-medium transition-all hover:bg-primary/10 active:scale-95 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            title={`Switch to ${language === "hi" ? "English" : "Hindi"}`}
+            className={`${iconButton} inline-flex items-center gap-1.5 text-xs font-medium`}
           >
-            <Languages className="w-4 h-4" />
+            <Languages className="w-5 h-5" />
             {language === "hi" ? "हिं" : "EN"}
           </button>
+          <Link to="/settings" aria-label="Settings" title="Settings" className={iconButton}>
+            <Settings className="w-5 h-5" />
+          </Link>
           <button
             onClick={signOut}
             aria-label="Sign out"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted border border-border text-sm font-medium transition-all hover:bg-destructive/10 hover:text-destructive active:scale-95 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            title="Sign out"
+            className={iconButton}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5" />
           </button>
+          <Link to="/dashboard" aria-label="Close" title="Close" className={iconButton}>
+            <X className="w-5 h-5" />
+          </Link>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-8 max-w-lg mx-auto w-full">
-        <div className="text-center">
-          <p className="text-xs text-foreground/40 uppercase tracking-widest font-semibold mb-1">
-            {user?.email ?? "Signed in"}
+      {/* Main */}
+      <main className="relative z-10 w-full max-w-[1000px] px-8 text-center flex flex-col items-center">
+        <header className="fade-rise stagger-1 mb-16 text-center">
+          <h1 className="font-serif text-5xl md:text-6xl text-white mb-4 tracking-[-2.46px]">
+            {language === "hi" ? "आज मैं आपकी कैसे मदद करूं?" : "How can I help you today?"}
+          </h1>
+          <p className="text-white/50 text-lg font-light">
+            {language === "hi"
+              ? "बाज़ार भाव, मौसम, फसल सलाह या खरीदार पूछें।"
+              : "Ask about market prices, weather, crop insights, or buyers."}
+          </p>
+        </header>
+
+        {/* Mic + waveform */}
+        <div className="fade-rise stagger-2 mb-12 flex flex-col items-center relative">
+          <div className="absolute -top-12 flex items-center gap-2 bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
+            <div
+              className="w-2 h-2 rounded-full dot-pulse"
+              style={{ backgroundColor: STATE_DOT[agentState] }}
+            />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">
+              {STATE_LABEL[agentState]}
+            </span>
+          </div>
+
+          <div className="relative flex items-center justify-center">
+            <div className="flex items-center gap-1.5 mr-10">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="waveform-bar" style={showWaveform ? undefined : { animation: "none" }} />
+              ))}
+            </div>
+
+            <button
+              onClick={handleMicTap}
+              aria-label="Voice agent"
+              className={`w-[200px] h-[200px] rounded-full ${STATE_CLASS[agentState]} flex items-center justify-center text-white shadow-2xl transition-all duration-500 hover:scale-105 ${step === "result" || step === "error" || step === "idle" ? "" : "mic-pulse"} group cursor-pointer`}
+            >
+              {micIcon}
+            </button>
+
+            <div className="flex items-center gap-1.5 ml-10">
+              {[5, 6, 7, 8].map((n) => (
+                <div key={n} className="waveform-bar" style={showWaveform ? undefined : { animation: "none" }} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Transcription */}
+        <div className="fade-rise stagger-3 w-full max-w-[600px] mb-12 text-center">
+          <p className="text-white/70 text-lg leading-relaxed font-light transition-all duration-500">
+            {step === "recording" && interimText
+              ? `"${interimText}"`
+              : finalText
+                ? `"${finalText}"`
+                : "—"}
           </p>
         </div>
 
-        {step === "idle" && (
-          <div className="flex flex-col items-center gap-8 w-full animate-fade-in-up">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                {language === "hi" ? "नमस्ते किसान भाई! 🌱" : "Hello Farmer! 🌱"}
-              </h2>
-              <p className="text-foreground/60 text-base">
-                {language === "hi"
-                  ? "बोलिए — मौसम, फसल की सलाह, मंडी भाव"
-                  : "Speak — weather, crop advice, market prices"}
-              </p>
+        {/* Agent card */}
+        {(step === "thinking" || step === "result") && response && (
+          <div className="fade-rise stagger-4 w-full max-w-[600px] bg-white/95 backdrop-blur-xl border border-white/10 rounded-[32px] p-8 shadow-2xl text-left">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Agent Response
+              </span>
+              {step === "thinking" && (
+                <div className="flex gap-1">
+                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" />
+                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                </div>
+              )}
             </div>
 
-            <MicButton isRecording={false} isConnecting={false} onClick={handleMicTap} />
-
-            <button
-              onClick={() => setShowTextInput(!showTextInput)}
-              className="text-sm text-foreground/50 underline underline-offset-2 hover:text-foreground/80 transition-colors cursor-pointer"
-            >
-              {language === "hi" ? "टाइप करके पूछें" : "Type your question instead"}
-            </button>
-
-            {showTextInput && <TextInput onSubmit={handleTextSubmit} />}
-          </div>
-        )}
-
-        {(step === "connecting" || step === "recording") && (
-          <div className="flex flex-col items-center gap-8 w-full animate-fade-in-up">
-            {interimText && (
-              <div className="w-full bg-card rounded-xl border border-border px-5 py-4 min-h-[60px]">
-                <p className="text-base text-foreground/80 leading-relaxed">
-                  {interimText}
-                  {step === "recording" && (
-                    <span className="inline-block w-2 h-5 bg-primary ml-1 animate-pulse align-middle rounded-sm" />
-                  )}
-                </p>
+            {step === "result" ? (
+              <>
+                <p className="text-[#0f172a] text-lg leading-relaxed">{response.recommendation}</p>
+                {response.weather_summary && (
+                  <p className="text-[#0f172a]/60 text-sm leading-relaxed mt-4">
+                    {response.weather_summary}
+                  </p>
+                )}
+                {response.price_estimate && (
+                  <p className="text-[#0f172a]/60 text-sm leading-relaxed mt-1">
+                    {response.price_estimate}
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-3 mt-6">
+                  <button
+                    onClick={() => speak(response.recommendation)}
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded-full text-xs font-semibold uppercase tracking-wider border transition-all cursor-pointer ${
+                      isSpeaking
+                        ? "bg-[#3b82f6] border-[#3b82f6] text-white"
+                        : "bg-white/5 border-white/10 text-slate-500 hover:bg-black hover:text-white"
+                    }`}
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    Replay
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-xs font-semibold uppercase tracking-wider border bg-white/5 border-white/10 text-slate-500 hover:bg-black hover:text-white transition-all cursor-pointer"
+                  >
+                    <Mic className="w-4 h-4" />
+                    New Question
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:0.4s]" />
               </div>
             )}
-
-            <MicButton
-              isRecording={isRecording}
-              isConnecting={step === "connecting"}
-              onClick={handleMicTap}
-            />
-
-            {step === "recording" && !interimText && (
-              <p className="text-sm text-foreground/50">
-                {language === "hi" ? "सुन रहा हूं…" : "Listening…"}
-              </p>
-            )}
-
-            <button
-              onClick={() => setShowTextInput(!showTextInput)}
-              className="text-sm text-foreground/50 underline underline-offset-2 hover:text-foreground/80 transition-colors cursor-pointer"
-            >
-              {language === "hi" ? "टाइप करके पूछें" : "Type your question instead"}
-            </button>
-
-            {showTextInput && <TextInput onSubmit={handleTextSubmit} />}
           </div>
         )}
 
-        {step === "thinking" && (
-          <div className="flex flex-col items-center gap-6 animate-fade-in-up">
-            {finalText && (
-              <div className="w-full bg-card rounded-xl border border-border px-5 py-4">
-                <p className="text-base text-foreground/80">"{finalText}"</p>
-              </div>
-            )}
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin-slow" />
-              <p className="text-sm text-foreground/50 font-medium">
-                {language === "hi" ? "सोच रहा हूं…" : "Thinking…"}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {step === "result" && response && (
-          <ResponseCard
-            data={response}
-            isSpeaking={isSpeaking}
-            onReplay={() => speak(response.recommendation)}
-            onReset={handleReset}
-          />
-        )}
-
+        {/* Error card */}
         {step === "error" && (
-          <div className="flex flex-col items-center gap-6 animate-fade-in-up w-full">
-            <div className="w-full bg-card rounded-2xl border border-destructive/20 p-6 text-center">
-              <AlertTriangle className="w-10 h-10 text-destructive mx-auto mb-3" />
-              <p className="text-base text-foreground/80 mb-1 font-medium">
-                {language === "hi" ? "कुछ गलत हुआ" : "Something went wrong"}
-              </p>
-              <p className="text-sm text-foreground/60">{errorMessage}</p>
-            </div>
-
-            <div className="flex flex-col items-center gap-4">
+          <div className="fade-rise stagger-4 w-full max-w-[600px] bg-white/95 backdrop-blur-xl border border-white/10 rounded-[32px] p-8 shadow-2xl text-left">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Something went wrong
+            </span>
+            <p className="text-[#0f172a] text-lg leading-relaxed mt-2">{errorMessage}</p>
+            <div className="flex flex-wrap items-center gap-3 mt-6">
               <button
                 onClick={handleReset}
-                className="px-6 py-3 rounded-xl bg-primary text-on-primary font-semibold transition-all hover:bg-secondary active:scale-95 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-xs font-semibold uppercase tracking-wider bg-black text-white transition-all cursor-pointer"
               >
-                {language === "hi" ? "फिर से कोशिश करें" : "Try Again"}
+                Try Again
               </button>
-
-              {micBlocked && <TextInput onSubmit={handleTextSubmit} />}
             </div>
           </div>
+        )}
+
+        {/* Suggestions */}
+        {step === "idle" && (
+          <div className="fade-rise stagger-4 mt-12 flex flex-wrap justify-center gap-3">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => handleTextSubmit(s)}
+                className="px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white/60 text-xs font-semibold uppercase tracking-wider hover:bg-white hover:text-black transition-all cursor-pointer"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Text input fallback */}
+        {showTextInput && (
+          <div className="w-full max-w-[600px] mt-8">
+            <TextInput onSubmit={handleTextSubmit} />
+          </div>
+        )}
+
+        {!showTextInput && step !== "result" && step !== "thinking" && (
+          <button
+            onClick={() => setShowTextInput((v) => !v)}
+            className="mt-8 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/40 hover:text-white transition-all cursor-pointer"
+          >
+            <Keyboard className="w-4 h-4" />
+            {language === "hi" ? "टाइप करके पूछें" : "Type your question"}
+          </button>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="py-3 text-center text-xs text-foreground/30">
-        Harvest Window — {language === "hi" ? "आपका खेती सलाहकार" : "Your Farming Advisor"}
-      </footer>
+      <p className="relative z-10 text-center text-xs text-white/30 mt-10 pb-6">
+        {user?.email ?? "Signed in"} · Harvest Window
+      </p>
     </div>
   );
 }
