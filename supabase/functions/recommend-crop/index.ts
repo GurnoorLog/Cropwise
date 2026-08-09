@@ -76,17 +76,25 @@ Location: ${district}
 Live market prices per kg: ${priceStr || "unavailable"}
 Weather: ${weatherSummary || "weather data unavailable"}${historyBlock}
 
-Write:
-1. weather_summary — a short one-line summary of the weather relevant to selling.
-2. price_estimate — a short line describing the current market price picture.
-3. recommendation — a 2-3 sentence plain-language recommendation on when to sell and why.
-4. spoilage_risk — "green", "yellow", or "red" based on weather-driven spoilage risk.
-5. language — "hi" or "en" based on whether the user asked in Hindi.
-6. result_type — classify the user's intent as EXACTLY one of: "weather" (forecast/climate), "prices" (market prices), "news" (market news/insights), "buyers" (buyers/mandi opportunities), "calendar" (crop sowing/harvest calendar), "schemes" (MSP/government schemes), or "chat" (general advice or anything else).
-7. follow_up — a short one-line follow-up question in the same language inviting the farmer to go deeper, or "" if nothing.
+Return ONLY a JSON object with EXACTLY these 7 keys:
+1. weather_summary — one short line on the weather relevant to selling.
+2. price_estimate — one short line on the current market price picture.
+3. recommendation — 2-3 sentences in plain language answering the user's question and advising when to sell and why.
+4. spoilage_risk — EXACTLY one of "green", "yellow", "red" (weather-driven spoilage risk).
+5. language — EXACTLY "hi" if the user wrote in Hindi or Hinglish, otherwise "en".
+6. result_type — pick the SINGLE best category for the user's request:
+   - "weather" for forecasts, rain, climate, temperature questions
+   - "prices" for market/mandi prices or the price of any crop
+   - "news" for market news, trends, or insights
+   - "buyers" for buyers, mandi buyers, or selling opportunities
+   - "calendar" for sowing, planting, harvesting, or crop-season timing
+   - "schemes" for MSP, subsidies, government schemes, or loans
+   - "chat" ONLY for general advice or anything not matching above
+   Examples: "when should I sow wheat" -> calendar; "wheat price in Agra" -> prices; "what MSP schemes" -> schemes; "will it rain tomorrow" -> weather; "who buys onions" -> buyers.
+7. follow_up — a short follow-up question (5-10 words) in the same language as the user to continue the conversation. ALWAYS provide one; never empty.
 
-Respond with ONLY valid JSON in exactly this shape:
-{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en","result_type":"chat","follow_up":""}`;
+Respond with ONLY valid JSON in EXACTLY this shape:
+{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en","result_type":"calendar","follow_up":"..."}`;
 
   try {
     const res = await fetch(AI_ENDPOINT, {
@@ -98,7 +106,7 @@ Respond with ONLY valid JSON in exactly this shape:
       body: JSON.stringify({
         model: AI_MODEL,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.6,
+        temperature: 0.3,
       }),
     });
 
@@ -129,7 +137,8 @@ Respond with ONLY valid JSON in exactly this shape:
         : parsed.spoilage_risk === "green"
           ? "green"
           : "yellow";
-    const resultType =
+
+    const modelType =
       parsed.result_type === "weather" ||
       parsed.result_type === "prices" ||
       parsed.result_type === "news" ||
@@ -139,12 +148,37 @@ Respond with ONLY valid JSON in exactly this shape:
         ? parsed.result_type
         : "chat";
 
+    const lower = query.toLowerCase();
+    const keywordType =
+      /scheme|msp|subsid|yojna|योजना|grant|loan|किसान क्रेडिट/.test(lower)
+        ? "schemes"
+        : /price|rate|mandi|bhaav|भाव|दर|कीमत|cost/.test(lower)
+          ? "prices"
+          : /sow|sowing|plant|harvest|season|calendar|बुवाई|कटाई|कैलेंडर/.test(lower)
+            ? "calendar"
+            : /rain|weather|temp|forecast|मौसम|बारिश|तापमान/.test(lower)
+              ? "weather"
+              : /buyer|who buys|mandi buyer|क्रेता|खरीदार/.test(lower)
+                ? "buyers"
+                : /news|insight|trend|market news/.test(lower)
+                  ? "news"
+                  : /advice|what should i do|how do i|help me/.test(lower)
+                    ? "chat"
+                    : null;
+
+    const resultType = keywordType ?? modelType;
+    const language = /[\u0900-\u097F]/.test(query)
+      ? "hi"
+      : parsed.language === "hi"
+        ? "hi"
+        : "en";
+
     return corsResponse({
       weather_summary: (parsed.weather_summary as string) ?? weatherSummary,
       price_estimate: (parsed.price_estimate as string) ?? priceStr,
       recommendation: (parsed.recommendation as string) ?? "",
       spoilage_risk: risk,
-      language: parsed.language === "hi" ? "hi" : "en",
+      language,
       result_type: resultType,
       follow_up: (parsed.follow_up as string) ?? "",
     });
