@@ -14,6 +14,8 @@ import AuthCallbackPage from "./pages/AuthCallbackPage";
 import AdvisorPage from "./pages/AdvisorPage";
 import DashboardPage from "./pages/DashboardPage";
 import NewsPage from "./pages/NewsPage";
+import CalendarPage from "./pages/CalendarPage";
+import SchemesPage from "./pages/SchemesPage";
 import SettingsPage from "./pages/SettingsPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import WeatherPage from "./pages/WeatherPage";
@@ -69,6 +71,22 @@ function AppRoutes() {
         element={
           <Protected>
             <NewsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <Protected>
+            <CalendarPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/schemes"
+        element={
+          <Protected>
+            <SchemesPage />
           </Protected>
         }
       />

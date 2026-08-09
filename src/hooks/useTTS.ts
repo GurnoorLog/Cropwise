@@ -2,11 +2,14 @@ import { useCallback, useRef, useState } from "react";
 
 interface UseTTSOptions {
   language: "hi" | "en";
+  onEnd?: () => void;
 }
 
-export function useTTS({ language }: UseTTSOptions) {
+export function useTTS({ language, onEnd }: UseTTSOptions) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const onEndRef = useRef(onEnd);
+  onEndRef.current = onEnd;
 
   const speak = useCallback(
     (text: string) => {
@@ -21,8 +24,14 @@ export function useTTS({ language }: UseTTSOptions) {
       utterance.pitch = 1.0;
 
       utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        onEndRef.current?.();
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        onEndRef.current?.();
+      };
 
       utteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);

@@ -1,10 +1,20 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Newspaper, Bot, Settings, CloudSun } from "lucide-react";
+import {
+  LayoutDashboard,
+  Newspaper,
+  Bot,
+  Settings,
+  CloudSun,
+  CalendarDays,
+  BadgeIndianRupee,
+} from "lucide-react";
 
 const ITEMS = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { to: "/weather", label: "Weather", icon: CloudSun },
   { to: "/news", label: "Forecasts", icon: Newspaper },
+  { to: "/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/schemes", label: "Schemes", icon: BadgeIndianRupee },
   { to: "/app", label: "Ask AI", icon: Bot },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -14,7 +24,7 @@ export default function MobileNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-[#171310]/90 backdrop-blur-xl border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-7">
         {ITEMS.map(({ to, label, icon: Icon }) => {
           const active = pathname === to;
           return (

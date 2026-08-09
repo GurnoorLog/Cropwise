@@ -1,6 +1,17 @@
-import type { AIResponse } from "../components/ResponseCard";
+import type { AIResponse, ResultType } from "../components/ResponseCard";
 import { supabase, SUPABASE_URL } from "../supabase";
 import { fetchMarketPrices, formatPrices } from "../data/prices";
+
+export function normalizeResultType(value: unknown): ResultType {
+  return value === "weather" ||
+    value === "prices" ||
+    value === "news" ||
+    value === "buyers" ||
+    value === "calendar" ||
+    value === "schemes"
+    ? value
+    : "chat";
+}
 
 export interface FarmContext {
   farmName: string;
@@ -23,8 +34,17 @@ export function buildPrompt(opts: {
   language: "hi" | "en";
   farm?: FarmContext | null;
   instructions?: string;
+  history?: { role: "user" | "agent"; text: string }[];
 }): string {
-  const { query, priceStr, weatherSummary, language, farm, instructions } = opts;
+  const { query, priceStr, weatherSummary, language, farm, instructions, history } = opts;
+
+  const historyBlock =
+    history && history.length > 0
+      ? `
+Conversation so far (most recent last):
+${history.slice(-8).map((t) => `${t.role === "user" ? "Farmer" : "Harvest Window"}: ${t.text}`).join("\n")}
+Use this to resolve follow-up references (e.g. "and tomorrow?" refers to the last topic).`
+      : "";
 
   const farmBlock = farm
     ? `
@@ -46,20 +66,23 @@ Use this profile to personalise every recommendation. Always tie advice to the c
 2. price_estimate — a short line describing the current market price picture.
 3. recommendation — a 2-3 sentence plain-language recommendation on when to sell and why.
 4. spoilage_risk — "green", "yellow", or "red" based on weather-driven spoilage risk.
-5. language — "hi" or "en".`;
+5. language — "hi" or "en".
+6. result_type — classify the user's intent as EXACTLY one of: "weather" (forecast/climate), "prices" (market prices), "news" (market news/insights), "buyers" (buyers/mandi opportunities), "calendar" (crop sowing/harvest calendar), "schemes" (MSP/government schemes), or "chat" (general advice or anything else).
+7. follow_up — a short one-line follow-up question in the same language inviting the farmer to go deeper, or "" if nothing.`;
 
   return `You are Harvest Window, an AI assistant for ${farm?.location || "Indian"} farmers deciding when to sell their crop. Here is the data:
 
 Crop query: ${query}
 Live market prices per kg: ${priceStr}
 Weather: ${weatherSummary || "weather data unavailable"}
+${historyBlock}
 ${farmBlock}
 Respond in ${language === "hi" ? "Hindi" : "English"}.
 
 ${taskBlock}
 
 Respond with ONLY valid JSON in exactly this shape:
-{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en"}`;
+{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en","result_type":"chat","follow_up":""}`;
 }
 
 /** Call the AI/ML API directly from the browser using a user-provided key */
@@ -71,8 +94,9 @@ export async function callAIMLDirect(opts: {
   apiKey: string;
   farm?: FarmContext | null;
   instructions?: string;
+  history?: { role: "user" | "agent"; text: string }[];
 }): Promise<AIResponse> {
-  const { query, priceStr, weatherSummary, language, apiKey, farm, instructions } = opts;
+  const { query, priceStr, weatherSummary, language, apiKey, farm, instructions, history } = opts;
 
   const res = await fetch(AI_ENDPOINT, {
     method: "POST",
@@ -82,7 +106,7 @@ export async function callAIMLDirect(opts: {
     },
     body: JSON.stringify({
       model: AI_MODEL,
-      messages: [{ role: "user", content: buildPrompt({ query, priceStr, weatherSummary, language, farm, instructions }) }],
+      messages: [{ role: "user", content: buildPrompt({ query, priceStr, weatherSummary, language, farm, instructions, history }) }],
       temperature: 0.6,
     }),
   });
@@ -107,6 +131,8 @@ export async function callAIMLDirect(opts: {
     recommendation: parsed.recommendation,
     spoilage_risk: risk,
     language: parsed.language === "hi" ? "hi" : "en",
+    result_type: normalizeResultType(parsed.result_type),
+    follow_up: parsed.follow_up ?? "",
   };
 }
 
@@ -121,8 +147,9 @@ export async function getAIResponse(opts: {
   lon?: number;
   district?: string;
   instructions?: string;
+  history?: { role: "user" | "agent"; text: string }[];
 }): Promise<AIResponse> {
-  const { query, weatherSummary, language, apiKey, farm, lat, lon, district, instructions } = opts;
+  const { query, weatherSummary, language, apiKey, farm, lat, lon, district, instructions, history } = opts;
   const prices = await fetchMarketPrices();
   const priceStr = formatPrices(prices);
 
@@ -135,6 +162,7 @@ export async function getAIResponse(opts: {
       apiKey,
       farm,
       instructions,
+      history,
     });
   }
 
@@ -149,10 +177,25 @@ export async function getAIResponse(opts: {
       weather: weatherSummary ? { summary: weatherSummary } : null,
       prices: { summary: priceStr },
       farm,
+      history: history ?? [],
     },
   });
   if (error) throw new Error(error.message || "AI request failed");
-  return data as AIResponse;
+  const raw = data as Partial<AIResponse> | null;
+  return {
+    weather_summary: raw?.weather_summary ?? weatherSummary,
+    price_estimate: raw?.price_estimate ?? priceStr,
+    recommendation: raw?.recommendation ?? "",
+    spoilage_risk:
+      raw?.spoilage_risk === "red"
+        ? "red"
+        : raw?.spoilage_risk === "green"
+          ? "green"
+          : "yellow",
+    language: raw?.language === "hi" ? "hi" : "en",
+    result_type: normalizeResultType(raw?.result_type),
+    follow_up: raw?.follow_up ?? "",
+  };
 }
 
 /** Fetch a compact weather summary from Open-Meteo for the farm region. */

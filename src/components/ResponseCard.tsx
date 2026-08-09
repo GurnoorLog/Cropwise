@@ -1,11 +1,22 @@
 import { Volume2, RefreshCw } from "lucide-react";
 
+export type ResultType =
+  | "weather"
+  | "prices"
+  | "news"
+  | "buyers"
+  | "calendar"
+  | "schemes"
+  | "chat";
+
 export interface AIResponse {
   weather_summary: string;
   price_estimate: string;
   recommendation: string;
   spoilage_risk: "green" | "yellow" | "red";
   language: "hi" | "en";
+  result_type?: ResultType;
+  follow_up?: string;
 }
 
 interface ResponseCardProps {

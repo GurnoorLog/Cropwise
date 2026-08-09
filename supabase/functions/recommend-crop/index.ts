@@ -10,6 +10,7 @@ interface RecommendCropBody {
   location?: { lat?: number; lon?: number; district?: string };
   weather?: { summary?: string } | null;
   prices?: { summary?: string };
+  history?: { role: "user" | "agent"; text: string }[];
 }
 
 const CORS_HEADERS = {
@@ -59,13 +60,21 @@ Deno.serve(async (req: Request) => {
   const district = body.location?.district ?? "Pune";
   const weatherSummary = body.weather?.summary ?? "";
   const priceStr = body.prices?.summary ?? "";
+  const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
+
+  const historyBlock =
+    history.length > 0
+      ? `\nConversation so far (most recent last):\n${history
+          .map((t) => `${t.role === "user" ? "Farmer" : "Harvest Window"}: ${t.text}`)
+          .join("\n")}\nUse this to resolve follow-up references (e.g. "and tomorrow?" refers to the last topic).`
+      : "";
 
   const prompt = `You are Harvest Window, helping a farmer decide when to sell their crop. Here is the data:
 
 Crop query: ${query}
 Location: ${district}
 Live market prices per kg: ${priceStr || "unavailable"}
-Weather: ${weatherSummary || "weather data unavailable"}
+Weather: ${weatherSummary || "weather data unavailable"}${historyBlock}
 
 Write:
 1. weather_summary — a short one-line summary of the weather relevant to selling.
@@ -73,9 +82,11 @@ Write:
 3. recommendation — a 2-3 sentence plain-language recommendation on when to sell and why.
 4. spoilage_risk — "green", "yellow", or "red" based on weather-driven spoilage risk.
 5. language — "hi" or "en" based on whether the user asked in Hindi.
+6. result_type — classify the user's intent as EXACTLY one of: "weather" (forecast/climate), "prices" (market prices), "news" (market news/insights), "buyers" (buyers/mandi opportunities), "calendar" (crop sowing/harvest calendar), "schemes" (MSP/government schemes), or "chat" (general advice or anything else).
+7. follow_up — a short one-line follow-up question in the same language inviting the farmer to go deeper, or "" if nothing.
 
 Respond with ONLY valid JSON in exactly this shape:
-{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en"}`;
+{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en","result_type":"chat","follow_up":""}`;
 
   try {
     const res = await fetch(AI_ENDPOINT, {
@@ -118,6 +129,15 @@ Respond with ONLY valid JSON in exactly this shape:
         : parsed.spoilage_risk === "green"
           ? "green"
           : "yellow";
+    const resultType =
+      parsed.result_type === "weather" ||
+      parsed.result_type === "prices" ||
+      parsed.result_type === "news" ||
+      parsed.result_type === "buyers" ||
+      parsed.result_type === "calendar" ||
+      parsed.result_type === "schemes"
+        ? parsed.result_type
+        : "chat";
 
     return corsResponse({
       weather_summary: (parsed.weather_summary as string) ?? weatherSummary,
@@ -125,6 +145,8 @@ Respond with ONLY valid JSON in exactly this shape:
       recommendation: (parsed.recommendation as string) ?? "",
       spoilage_risk: risk,
       language: parsed.language === "hi" ? "hi" : "en",
+      result_type: resultType,
+      follow_up: (parsed.follow_up as string) ?? "",
     });
   } catch (err) {
     return corsResponse(

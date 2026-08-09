@@ -193,8 +193,17 @@ export default function SettingsPage() {
               <Link to="/dashboard" className={navLink(false)}>
                 Overview
               </Link>
+              <Link to="/weather" className={navLink(false)}>
+                Weather
+              </Link>
               <Link to="/news" className={navLink(false)}>
-                Forecasts
+                Markets
+              </Link>
+              <Link to="/calendar" className={navLink(false)}>
+                Calendar
+              </Link>
+              <Link to="/schemes" className={navLink(false)}>
+                Schemes
               </Link>
               <Link to="/app" className={navLink(false)}>
                 Ask AI Agent

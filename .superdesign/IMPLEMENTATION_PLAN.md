@@ -103,3 +103,133 @@ Repo: `C:\Users\tambe\Downloads\CropWise-source-code`
 ## Out of scope
 - Multi-location switcher / regional comparison (design mentions it; single farm location only for now).
 - F/C unit toggle, inHg/mm toggles, monthly/seasonal selectors — keep °C/km/mb (app is India-focused).
+
+---
+
+# Implementation Plan — Agent Mode ("Jarvis") + Dashboard Calendar / MSP / Schemes
+
+Repo: `C:\Users\tambe\Downloads\CropWise-source-code`
+
+## Vision (from user)
+
+- Add a **Dashboard ⇄ Agent** toggle in the top bar of every page.
+- Default mode = **Dashboard**; toggle persists in `localStorage` (`hw.mode`).
+- **Agent mode** = a voice-first "Jarvis". The user never navigates or types a full flow — the agent **executes actions** and **renders the result UI itself** (weather dashboard, news grid, prices, buyers, calendar, schemes) in a **split panel**: left = conversation/voice, right = the live rendered result.
+- Voice stays **always active** (auto-re-listen after each answer), narrates summaries via TTS, then asks a follow-up.
+- Nav bar must stay visible in agent mode (logo + links + user icon), unlike today's `/app` which is a bare page.
+- **Dashboard mode additions**: a **Calendar** page (crop season windows + weather-alert chips) and an **MSP / Schemes** page with direct apply links so the farmer can apply easily.
+
+## Decisions locked in (from Q&A)
+
+1. Result rendering = **Split panel** (left conversation/voice, right rendered tool UI).
+2. Toggle persists last choice in `localStorage`; default Dashboard.
+3. Include: Buyer matching + connect, Crop calendar & seasonal tips, Proactive voice alerts, MSP / government schemes, Conversation memory, plus Dashboard Calendar + Schemes pages with direct apply links.
+
+---
+
+## Phase 0 — Shared result components (refactor)
+
+The Agent right panel must render the SAME rich UIs that the dashboard pages show. Extract the current page bodies into reusable components so both Dashboard routes and Agent results share them:
+
+| Extract | From | To |
+|---|---|---|
+| Weather dashboard body | `WeatherPage.tsx` | `src/components/results/WeatherResult.tsx` (props: `FarmWeather \| null`, `lang`, `onViewFullAdvisory?`) |
+| News grid + featured | `NewsPage.tsx` | `src/components/results/NewsResult.tsx` (props: `rows`, `loading`) |
+| Market prices chart + best window | `DashboardPage.tsx` | `src/components/results/PricesResult.tsx` (props: `PriceRow[]`) |
+| Active buyers list | `DashboardPage.tsx` | `src/components/results/BuyersResult.tsx` (props: `BuyerRow[]`, `onConnect?`) |
+| Calendar (new) | — | `src/components/results/CalendarResult.tsx` |
+| Schemes / MSP (new) | — | `src/components/results/SchemesResult.tsx` |
+
+`WeatherPage`, `NewsPage`, `DashboardPage` become thin wrappers that fetch data and render these components — no visual change for dashboard mode.
+
+## Phase 1 — Agent orchestration (`src/lib/agent.ts`)
+
+New module that turns a voice query into **an action + data + narration**:
+
+```ts
+type AgentAction =
+  | "weather" | "news" | "prices" | "buyers"
+  | "calendar" | "schemes" | "advice" | "unknown";
+
+interface AgentResult {
+  action: AgentAction;
+  narration: string;        // TTS + conversation bubble
+  followUp?: string;        // "Want me to check tomorrow's window?"
+  data: unknown;            // payload for the right-panel renderer
+}
+```
+
+- `classifyAction(query, farm, history)` — calls the AI (existing `getAIResponse` path / edge function `recommend-crop` extended, or a new `agent-action` edge function) with a prompt that returns `{ action, narration, followUp }` in JSON.
+- `executeAction(action, farm)` — fetches live data per action:
+  - `weather` → existing `fetchFarmWeather(userId)`
+  - `news` → existing news fetch (edge `news-sync` / `news` table)
+  - `prices` → `market_prices` table (same as Dashboard)
+  - `buyers` → `buyers` table, filtered by user's crops
+  - `calendar` → new `crop_calendar` table (sowing/harvest windows by crop)
+  - `schemes` → new `schemes` + `msp_rates` tables
+- **Conversation memory**: keep `history: { role, text }[]` (last ~12 turns) in state; pass to classifier so "and tomorrow?" resolves from prior context.
+- **Proactive alerts**: on agent mount, compute `buildAlert` from weather; if triggered, auto-narrate + show alert banner in right panel (reuses `WeatherPage.buildAlert` logic → move to `src/lib/agent.ts` or `weather.ts`).
+
+## Phase 2 — Agent split-panel UI (`AdvisorPage.tsx` rework)
+
+Layout inside `min-h-screen` with the video bg + **sticky nav that now shows the Dashboard/Agent toggle** and the usual links (Overview / Weather / Markets / Calendar / Schemes) + UserMenu:
+
+```
+┌─────────────────────────── sticky top nav ───────────────────────────┐
+│ logo · [Dashboard|Agent] toggle · Overview Weather Markets Calendar  │
+│ Schemes  · lang  · user                                              │
+├─────────────── LEFT (w-[420px]) ───────────────┬─────────────────────┤
+│ · state pill (Listening/Processing/Speaking)   │  RIGHT = rendered   │
+│ · mic orb + waveform                           │  tool UI:           │
+│ · live transcript bubbles (user/agent)         │  WeatherResult /    │
+│ · suggestion chips                             │  NewsResult /       │
+│ · typed-input fallback                         │  PricesResult /     │
+│ · "voice always active" indicator              │  CalendarResult /   │
+│                                               │  SchemesResult      │
+└───────────────────────────────────────────────┴─────────────────────┘
+```
+
+- **Always-on loop**: after TTS narration finishes → auto `startRecording()` → on final transcript → classify → execute → render right panel → narrate → follow-up question → repeat. Mic tap = barge-in/interrupt.
+- Reuse `useSpeechmatics` + `useTTS` + `STATE_*` pills already in `AdvisorPage.tsx`.
+- `MobileNav` remains (5 items) — in agent mode the split becomes stacked (left collapses to a floating orb).
+
+## Phase 3 — Dashboard-mode additions
+
+### 3a. `CalendarPage.tsx` (`/calendar`)
+- Month grid (current month, prev/next arrows). Marks **sowing / growing / harvest windows** per crop from new `crop_calendar` table (seeded for common crops: tomato, onion, potato, wheat, rice, sugarcane…).
+- **Weather-alert chips**: day cells get an amber ring + ⚠ if that day falls in a frost/heavy-rain advisory range (computed from live forecast + `buildAlert`).
+- Season tip strip: "Best window to sow onion this region: now–mid Feb".
+- Route `/calendar` + nav link (Dashboard + MobileNav). Wrapper page uses `CalendarResult`.
+
+### 3b. `SchemesPage.tsx` (`/schemes`) — MSP + government schemes
+- **MSP card**: crop-wise minimum support price (₹/quintal) from new `msp_rates` table (2025-26 reference data, seeded).
+- **Schemes grid**: `schemes` table rows — name, ministry, summary, eligibility (hi/en), and a **"Apply / Learn more"** button linking directly to the official portal (e.g. PM-Kisan, KCC, PMFBY, e-NAM, crop insurance) — the farmer applies with one tap. Where possible pre-fill a URL with `?state=`/`language=hi`.
+- Route `/schemes` + nav link (Dashboard + MobileNav). Wrapper page uses `SchemesResult`.
+
+## Phase 4 — Data layer (Supabase)
+
+New tables (migration `agent_dashboard.sql`), all with RLS `select` for authenticated users:
+- `crop_calendar(id, crop, crop_hi, sowing_start, sowing_end, harvest_start, harvest_end, region)`
+- `msp_rates(id, crop, crop_hi, price_per_quintal, year, unit)`
+- `schemes(id, name, name_hi, ministry, summary, summary_hi, eligibility, eligibility_hi, apply_url, icon, category)`
+
+Seed inserts for ~10 crops, ~8 MSP crops, ~6 flagship schemes (PM-Kisan, KCC, PMFBY, e-NAM, PMKSY, NABARD). Serve via `supabase.from(...)` reads (no new edge function needed; data is static and small).
+
+## Phase 5 — Wiring
+
+- **Toggle**: new `src/components/ModeToggle.tsx` (segmented control). Persists `hw.mode` in `localStorage`. Mounted in: `LandingPage` (hidden when signed out), `DashboardPage`, `WeatherPage`, `NewsPage`, `SettingsPage`, reworked `AdvisorPage` navs. App routes read mode: if `mode==="agent"`, `AdvisorPage` replaces the routed page when user navigates to `/app`; Dashboard nav links still work for the other pages.
+- `App.tsx`: add `/calendar` + `/schemes` routes (Protected).
+- `MobileNav.tsx`: swap "Ask AI" → keep; add Calendar + Schemes (→ 7 items, use smaller labels or horizontal scroll).
+- Nav links on Dashboard/Weather/News/Settings gain Calendar + Schemes entries (match `navLink` styling).
+
+## Verification
+1. `npx tsc --noEmit` + `npm run build` pass.
+2. Manual: toggle Dashboard→Agent → persists after reload → ask "weather forecast" → right panel shows full weather UI + narration + auto-relisten → "news" → news grid renders → "and tomorrow?" uses memory.
+3. Dashboard: `/calendar` + `/schemes` render seeded data, apply links open.
+4. Supabase: migration applied, RLS select works.
+5. Commit + push; Vercel auto-deploys; deploy edge functions if changed.
+
+## Out of scope (v1)
+- Real buyer chat/call handoff (v1 = show buyer + "contact" copy action).
+- Multi-location agent context.
+- Persisted agent conversation across sessions (memory is per-session for v1).

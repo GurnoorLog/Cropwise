@@ -57,6 +57,56 @@ export function windDir(deg: number): string {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
+export interface WeatherAlert {
+  title: string;
+  badge: string;
+  body: string;
+  duration: string;
+}
+
+export function buildAlert(farm: FarmWeather): WeatherAlert | null {
+  const daily = farm.weather.daily;
+  const min0 = daily.temperature_2m_min?.[0];
+  const min1 = daily.temperature_2m_min?.[1];
+  const precipProb0 = daily.precipitation_probability_max?.[0];
+  const wind0 = daily.wind_speed_10m_max?.[0];
+
+  const tonight = Math.min(min0 ?? 99, min1 ?? 99);
+  if (tonight <= 4) {
+    return {
+      title: "Frost Advisory",
+      badge: "Caution Required",
+      body: `Temperatures expected to dip to ${Math.round(tonight)}°C overnight. Recommended to cover sensitive vegetable seedlings or activate irrigation systems to prevent ground freezing.`,
+      duration: "6 Hours",
+    };
+  }
+  if ((precipProb0 ?? 0) >= 60) {
+    return {
+      title: "Heavy Rain Advisory",
+      badge: "High Probability",
+      body: `${Math.round(precipProb0 ?? 0)}% chance of precipitation today. Delay spraying or open-field harvesting and clear drainage channels before the rain sets in.`,
+      duration: "24 Hours",
+    };
+  }
+  if ((wind0 ?? 0) >= 40) {
+    return {
+      title: "High Wind Advisory",
+      badge: "Gusty Conditions",
+      body: `Wind speeds reaching ${Math.round(wind0 ?? 0)} km/h. Secure greenhouse covers, netting and temporary structures before the gusts peak.`,
+      duration: "12 Hours",
+    };
+  }
+  return null;
+}
+
+export function uvLabel(uv: number): string {
+  if (uv < 3) return "Low";
+  if (uv < 6) return "Moderate";
+  if (uv < 8) return "High";
+  if (uv < 11) return "Very High";
+  return "Extreme";
+}
+
 export function weatherCodeMeta(
   code: number,
   language: "hi" | "en",

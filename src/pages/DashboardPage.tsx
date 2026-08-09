@@ -14,39 +14,8 @@ import { supabase } from "../supabase";
 import { getProfile, getFarmCrops, type Profile } from "../lib/profile";
 import MobileNav from "../components/MobileNav";
 import UserMenu from "../components/UserMenu";
-
-interface BuyerRow {
-  id: string;
-  name: string;
-  location: string | null;
-  crop_focus: string | null;
-  bid_min: number | null;
-  bid_max: number | null;
-  currency: string | null;
-  status: string | null;
-}
-
-interface PriceRow {
-  id: string;
-  crop: string;
-  crop_hi: string | null;
-  market: string | null;
-  min_price: number;
-  max_price: number;
-  unit: string | null;
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "HW";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function formatBid(bid: number | null, currency: string | null): string {
-  const cur = currency || "$";
-  return `${cur}${(bid ?? 0).toFixed(2)}/kg`;
-}
+import PricesResult, { type PriceRow } from "../components/results/PricesResult";
+import BuyersResult, { type BuyerRow } from "../components/results/BuyersResult";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -89,22 +58,6 @@ export default function DashboardPage() {
   const primaryCrop = crops[0] ?? prices[0]?.crop ?? "Tomatoes";
   const best = prices[0];
   const secondBest = prices[1];
-
-  const chartMax = prices.length
-    ? Math.max(...prices.map((p) => p.max_price))
-    : 1;
-  const chartHeights = prices.length
-    ? prices.map((p) => Math.max(25, 40 + (p.max_price / chartMax) * 45))
-    : [40, 45, 42, 55, 60, 75, 85];
-
-  const avgSpread =
-    prices.length > 0
-      ? prices.reduce(
-          (sum, p) =>
-            sum + (p.min_price > 0 ? ((p.max_price - p.min_price) / p.min_price) * 100 : 0),
-          0,
-        ) / prices.length
-      : 12.4;
 
   const saturation =
     best && best.min_price > 0
@@ -182,10 +135,13 @@ export default function DashboardPage() {
                 Weather
               </Link>
               <Link to="/news" className={navLink(false)}>
-                Forecasts
+                Markets
               </Link>
-              <Link to="/news" className={navLink(false)}>
-                Buyers
+              <Link to="/calendar" className={navLink(false)}>
+                Calendar
+              </Link>
+              <Link to="/schemes" className={navLink(false)}>
+                Schemes
               </Link>
               <Link
                 to="/app"
@@ -279,51 +235,10 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Market Prices */}
-                <div className="card-glass p-8 fade-rise stagger-3">
-                  <div className="flex justify-between items-center mb-8">
-                    <h2 className="font-serif text-2xl">
-                      Market Prices{" "}
-                      <span className="text-slate-300 text-lg font-light">
-                        / {prices[0]?.market ?? "Pune"}
-                      </span>
-                    </h2>
-                    <div className="flex items-center gap-2 text-green-600 font-bold">
-                      <TrendingUp className="w-4 h-4" />
-                      <span className="text-sm">+{avgSpread.toFixed(1)}%</span>
-                    </div>
-                  </div>
-
-                  <div className="h-48 relative overflow-hidden flex items-end justify-between px-2">
-                    <div className="absolute inset-0 chart-gradient rounded-xl" />
-                    {chartHeights.map((height, i) => (
-                      <div
-                        key={i}
-                        style={{ height: `${height}%` }}
-                        title={prices[i] ? `${prices[i].crop}: ₹${prices[i].max_price}/kg` : undefined}
-                        className={`w-8 rounded-t-lg transition-all hover:bg-black ${
-                          i === chartHeights.length - 1 || (prices[i] && prices[i].crop === primaryCrop)
-                            ? "bg-black"
-                            : "bg-slate-100"
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="flex justify-between pt-4 border-t border-slate-100 mt-4 text-[10px] font-bold text-slate-400 uppercase">
-                    {prices.length > 0
-                      ? prices.map((p) => (
-                          <span key={p.id}>{p.crop}</span>
-                        ))
-                      : (
-                          <>
-                            <span>Week 1</span>
-                            <span>Week 2</span>
-                            <span>Week 3</span>
-                            <span>Current</span>
-                          </>
-                        )}
-                  </div>
-                </div>
+                <PricesResult
+                  prices={prices}
+                  highlightCrop={primaryCrop}
+                />
               </div>
 
               <div className="space-y-8">
@@ -359,49 +274,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Active Buyers */}
-                <div className="card-glass p-8 fade-rise stagger-4">
-                  <h2 className="font-serif text-2xl mb-6">Active Buyers</h2>
-                  {buyers.length === 0 ? (
-                    <p className="text-sm text-slate-400">No active buyers yet.</p>
-                  ) : (
-                    <div className="space-y-6">
-                      {buyers.map((buyer) => (
-                        <div key={buyer.id} className="flex justify-between items-center group cursor-pointer">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-xs">
-                              {getInitials(buyer.name)}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold">{buyer.name}</p>
-                              <p className="text-[10px] text-slate-400">
-                                {buyer.location ?? ""}
-                                {buyer.crop_focus ? ` · ${buyer.crop_focus}` : ""}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-bold text-green-600">
-                              {formatBid(buyer.bid_max, buyer.currency)}
-                            </p>
-                            <p
-                              className={`text-[9px] ${
-                                buyer.status === "Active Bid" ? "text-green-600" : "text-slate-400"
-                              } font-bold uppercase tracking-widest`}
-                            >
-                              {buyer.status ?? "Active Bid"}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <Link
-                    to="/news"
-                    className="block w-full mt-8 py-4 rounded-xl bg-slate-50 text-slate-900 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer text-center"
-                  >
-                    View All Buyers
-                  </Link>
-                </div>
+                <BuyersResult buyers={buyers} />
               </div>
             </div>
 
