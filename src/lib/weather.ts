@@ -1,4 +1,5 @@
 import { getProfile } from "./profile";
+import type { SpeechLanguageCode } from "./languages";
 
 export interface GeocodeResult {
   name: string;
@@ -109,7 +110,7 @@ export function uvLabel(uv: number): string {
 
 export function weatherCodeMeta(
   code: number,
-  language: "hi" | "en",
+  language: SpeechLanguageCode,
 ): { desc: string; icon: string; tint: string } {
   const l = (en: string, hi: string) => (language === "hi" ? hi : en);
   if (code <= 3) return { desc: l("Clear", "साफ"), icon: "Sun", tint: "text-amber-500" };

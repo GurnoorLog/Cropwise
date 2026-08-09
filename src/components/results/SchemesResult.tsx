@@ -12,6 +12,7 @@ import {
   CircleCheck,
 } from "lucide-react";
 import type { MspRateRow, SchemeRow } from "../../lib/schemes";
+import type { SpeechLanguageCode } from "../../lib/languages";
 
 const ICONS: Record<string, typeof HandCoins> = {
   hand: HandCoins,
@@ -27,7 +28,7 @@ interface SchemesResultProps {
   schemes: SchemeRow[];
   msp: MspRateRow[];
   loading?: boolean;
-  lang?: "hi" | "en";
+  lang?: SpeechLanguageCode;
   userCrops?: string[];
 }
 

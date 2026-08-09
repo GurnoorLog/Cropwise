@@ -17,13 +17,14 @@ import BuyersResult, { type BuyerRow } from "./BuyersResult";
 import NewsResult, { type NewsRow } from "./NewsResult";
 import CalendarResult from "./CalendarResult";
 import SchemesResult from "./SchemesResult";
+import type { SpeechLanguageCode } from "../../lib/languages";
 
 type DataType = Exclude<ResultType, "chat">;
 
 interface AgentResultPanelProps {
   type: DataType;
   userId: string;
-  lang?: "hi" | "en";
+  lang?: SpeechLanguageCode;
 }
 
 async function fetchNews(): Promise<NewsRow[]> {

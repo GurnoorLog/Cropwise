@@ -19,6 +19,7 @@ import { getProfile, getFarmCrops } from "../lib/profile";
 import { useSpeechmatics } from "../hooks/useSpeechmatics";
 import { useTTS } from "../hooks/useTTS";
 import { getAIResponse, type FarmContext } from "../lib/ai";
+import { LANGUAGES, isSpeechLanguage, ttsLocale, type SpeechLanguageCode } from "../lib/languages";
 import { fetchFarmWeather } from "../lib/weather";
 import { proactiveAlert } from "../lib/agent";
 import { actionFromResultType } from "../lib/agent";
@@ -63,7 +64,7 @@ const STATE_CLASS: Record<AgentState, string> = {
 };
 
 export default function AdvisorPage() {
-  const [language, setLanguage] = useState<"hi" | "en">("hi");
+  const [language, setLanguage] = useState<SpeechLanguageCode>("hi");
   const [step, setStep] = useState<AdvisorStep>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [response, setResponse] = useState<AIResponse | null>(null);
@@ -92,6 +93,19 @@ export default function AdvisorPage() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [history, interimText, step]);
+
+  useEffect(() => {
+    if (!user) return;
+    let mounted = true;
+    getProfile(user.id).then((p) => {
+      if (mounted && p?.language && isSpeechLanguage(p.language)) {
+        setLanguage(p.language);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   const buildFarmContext = useCallback(async (): Promise<FarmContext | null> => {
     if (farmRef.current) return farmRef.current;
@@ -263,7 +277,7 @@ export default function AdvisorPage() {
           (aiResponse.follow_up ? `. ${aiResponse.follow_up}` : "");
         if (narration) {
           const utterance = new SpeechSynthesisUtterance(narration);
-          utterance.lang = ttsLang === "hi" ? "hi-IN" : "en-IN";
+          utterance.lang = ttsLocale(ttsLang);
           utterance.rate = 0.9;
           utterance.onend = () => {
             if (alwaysRef.current && stepRef.current === "result") {
@@ -314,12 +328,6 @@ export default function AdvisorPage() {
     },
     [getAIRecommendation],
   );
-
-  /** Toggle language */
-  const toggleLanguage = useCallback(() => {
-    setLanguage((l) => (l === "hi" ? "en" : "hi"));
-    stop();
-  }, [stop]);
 
   /** Reset */
   const handleReset = useCallback(() => {
@@ -412,15 +420,25 @@ export default function AdvisorPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              onClick={toggleLanguage}
-              aria-label={`Switch to ${language === "hi" ? "English" : "Hindi"}`}
-              title={`Switch to ${language === "hi" ? "English" : "Hindi"}`}
-              className={`${iconButton} inline-flex items-center gap-1.5 text-xs font-medium`}
-            >
-              <Languages className="w-5 h-5" />
-              {language === "hi" ? "हिं" : "EN"}
-            </button>
+            <div className="inline-flex items-center gap-2">
+              <Languages className="w-5 h-5 text-white/60" />
+              <select
+                value={language}
+                onChange={(e) => {
+                  setLanguage(e.target.value as SpeechLanguageCode);
+                  stop();
+                }}
+                aria-label="Language"
+                title="Language"
+                className="bg-white/10 border border-white/10 text-white text-xs font-medium rounded-full pl-3 pr-2 py-1.5 outline-none cursor-pointer [&>option]:text-black focus-visible:ring-2 focus-visible:ring-white/30"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.code === "en" ? "English" : l.native}
+                  </option>
+                ))}
+              </select>
+            </div>
             <Link to="/dashboard" aria-label="Close" title="Close" className={iconButton}>
               <X className="w-5 h-5" />
             </Link>

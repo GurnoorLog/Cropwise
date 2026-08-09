@@ -3,11 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Check, Loader2, MapPin, Phone, Mail, Sprout } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { ensureProfile, getProfile, saveProfile, setFarmCrops } from "../lib/profile";
+import { LANGUAGES, languageName } from "../lib/languages";
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 const STEPS = [
   { title: "Farm Basics", subtitle: "Name & Location" },
+  { title: "Language", subtitle: "Voice preference" },
   { title: "Crop Portfolio", subtitle: "Yield selection" },
   { title: "Farm Details", subtitle: "Scale & Infra" },
   { title: "Contact Info", subtitle: "Direct link" },
@@ -39,6 +41,7 @@ export default function OnboardingPage() {
   const [farmName, setFarmName] = useState("");
   const [location, setLocation] = useState("");
   const [farmType, setFarmType] = useState("");
+  const [language, setLanguage] = useState("en");
   const [crops, setCrops] = useState<string[]>([]);
   const [customCrop, setCustomCrop] = useState("");
   const [farmSize, setFarmSize] = useState("");
@@ -81,10 +84,12 @@ export default function OnboardingPage() {
       case 1:
         return farmName.trim().length > 0 && location.trim().length > 0 && farmType !== "";
       case 2:
-        return crops.length > 0;
+        return true;
       case 3:
-        return farmSize.trim().length > 0 && Number(farmSize) > 0;
+        return crops.length > 0;
       case 4:
+        return farmSize.trim().length > 0 && Number(farmSize) > 0;
+      case 5:
         return email.length > 0;
       default:
         return true;
@@ -94,7 +99,7 @@ export default function OnboardingPage() {
   const next = () => {
     setError("");
     if (!stepValid()) {
-      setError(step === 2 ? "Select at least one crop to continue." : "Please fill in the highlighted fields.");
+      setError(step === 3 ? "Select at least one crop to continue." : "Please fill in the highlighted fields.");
       return;
     }
     if (step < TOTAL_STEPS) setStep((s) => s + 1);
@@ -123,6 +128,7 @@ export default function OnboardingPage() {
         farm_name: farmName.trim(),
         farm_location: location.trim(),
         farm_type: farmType,
+        language,
         farm_size: Number(farmSize),
         farm_size_unit: farmSizeUnit,
         irrigation_method: irrigation || null,
@@ -280,8 +286,40 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 2: Crop Portfolio */}
+            {/* Step 2: Language */}
             {step === 2 && (
+              <div className="space-y-8 animate-fade-in-up">
+                <div className="space-y-4">
+                  <h1 className="font-serif text-[40px] md:text-[48px] text-[#0f172a] leading-none tracking-[-2.46px]">
+                    Which language do you prefer?
+                  </h1>
+                  <p className="text-slate-500 text-lg">Your AI agent will listen and reply in this language.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {LANGUAGES.map((l) => (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => setLanguage(l.code)}
+                      className={`px-5 py-4 rounded-2xl border flex items-center gap-4 transition-all ${
+                        language === l.code
+                          ? "border-black bg-black text-white"
+                          : "border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="text-2xl leading-none w-14 text-center shrink-0">{l.native}</span>
+                      <span className="flex-1">
+                        <span className="block text-sm font-semibold">{l.name}</span>
+                      </span>
+                      {language === l.code && <Check className="w-4 h-4 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Crop Portfolio */}
+            {step === 3 && (
               <div className="space-y-8 animate-fade-in-up">
                 <div className="space-y-4">
                   <h1 className="font-serif text-[40px] md:text-[48px] text-[#0f172a] leading-none tracking-[-2.46px]">
@@ -321,8 +359,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 3: Farm Details */}
-            {step === 3 && (
+            {/* Step 4: Farm Details */}
+            {step === 4 && (
               <div className="space-y-8 animate-fade-in-up">
                 <div className="space-y-4">
                   <h1 className="font-serif text-[40px] md:text-[48px] text-[#0f172a] leading-none tracking-[-2.46px]">
@@ -399,8 +437,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 4: Contact Info */}
-            {step === 4 && (
+            {/* Step 5: Contact Info */}
+            {step === 5 && (
               <div className="space-y-8 animate-fade-in-up">
                 <div className="space-y-4">
                   <h1 className="font-serif text-[40px] md:text-[48px] text-[#0f172a] leading-none tracking-[-2.46px]">
@@ -470,8 +508,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 5: Confirmation */}
-            {step === 5 && (
+            {/* Step 6: Confirmation */}
+            {step === 6 && (
               <div className="space-y-8 animate-fade-in-up">
                 <div className="space-y-4">
                   <h1 className="font-serif text-[40px] md:text-[48px] text-[#0f172a] leading-none tracking-[-2.46px]">
@@ -525,6 +563,16 @@ export default function OnboardingPage() {
                     <p className="text-xs text-slate-500 mt-1">
                       Preferred: <span className="font-semibold text-slate-700">{contactMethod}</span>
                     </p>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-slate-50">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Language</p>
+                    <p className="text-sm font-bold text-slate-900">
+                      {languageName(language)}{" "}
+                      <span className="text-slate-400 font-medium">
+                        {LANGUAGES.find((l) => l.code === language)?.native}
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Used by your AI agent for voice.</p>
                   </div>
                 </div>
               </div>

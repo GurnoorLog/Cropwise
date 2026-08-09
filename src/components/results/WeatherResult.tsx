@@ -24,6 +24,7 @@ import {
   uvLabel,
   type FarmWeather,
 } from "../../lib/weather";
+import type { SpeechLanguageCode } from "../../lib/languages";
 
 const ICONS: Record<string, typeof Sun> = {
   Sun,
@@ -52,7 +53,7 @@ function hourLabel(iso: string): string {
 interface WeatherResultProps {
   farm: FarmWeather | null;
   loading?: boolean;
-  lang?: "hi" | "en";
+  lang?: SpeechLanguageCode;
   onRetry?: () => void;
   onViewAdvisory?: () => void;
   compact?: boolean;

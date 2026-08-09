@@ -1,4 +1,5 @@
 import { Volume2, RefreshCw } from "lucide-react";
+import type { SpeechLanguageCode } from "../lib/languages";
 
 export type ResultType =
   | "weather"
@@ -14,7 +15,7 @@ export interface AIResponse {
   price_estimate: string;
   recommendation: string;
   spoilage_risk: "green" | "yellow" | "red";
-  language: "hi" | "en";
+  language: SpeechLanguageCode;
   result_type?: ResultType;
   follow_up?: string;
 }
@@ -26,7 +27,7 @@ interface ResponseCardProps {
   onReset: () => void;
 }
 
-function SpoilageBadge({ risk, lang }: { risk: string; lang: "hi" | "en" }) {
+function SpoilageBadge({ risk, lang }: { risk: string; lang: SpeechLanguageCode }) {
   const labels: Record<string, { hi: string; en: string }> = {
     green: { hi: "कम जोखिम", en: "Low Risk" },
     yellow: { hi: "मध्यम जोखिम", en: "Moderate Risk" },
@@ -39,7 +40,7 @@ function SpoilageBadge({ risk, lang }: { risk: string; lang: "hi" | "en" }) {
     red: "bg-destructive/10 text-destructive border-destructive/30",
   };
 
-  const label = labels[risk]?.[lang] ?? labels.yellow[lang];
+  const label = (labels[risk] ?? labels.yellow)[lang === "hi" ? "hi" : "en"];
 
   return (
     <span

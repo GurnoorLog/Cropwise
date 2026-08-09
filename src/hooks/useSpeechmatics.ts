@@ -9,9 +9,10 @@ import {
 } from "@speechmatics/browser-audio-input-react";
 import { supabase } from "../supabase";
 import { getApiKey } from "../lib/apiKeys";
+import type { SpeechLanguageCode } from "../lib/languages";
 
 interface UseSpeechmaticsOptions {
-  language: "hi" | "en";
+  language: SpeechLanguageCode;
   onFinalTranscript: (text: string) => void;
   onInterimTranscript: (text: string) => void;
   onError: (error: string) => void;

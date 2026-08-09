@@ -12,6 +12,7 @@ import {
 import type { CropCalendarRow, CalendarPhase } from "../../lib/schemes";
 import { phaseForDay } from "../../lib/schemes";
 import type { FarmWeather } from "../../lib/weather";
+import type { SpeechLanguageCode } from "../../lib/languages";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -47,7 +48,7 @@ const PHASE_META: Record<Exclude<CalendarPhase, null>, {
 interface CalendarResultProps {
   rows: CropCalendarRow[];
   loading?: boolean;
-  lang?: "hi" | "en";
+  lang?: SpeechLanguageCode;
   farm?: FarmWeather | null;
   userCrops?: string[];
 }

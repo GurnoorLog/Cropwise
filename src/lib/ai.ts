@@ -1,6 +1,7 @@
 import type { AIResponse, ResultType } from "../components/ResponseCard";
 import { supabase, SUPABASE_URL } from "../supabase";
 import { fetchMarketPrices, formatPrices } from "../data/prices";
+import { isSpeechLanguage, languageName, type SpeechLanguageCode } from "./languages";
 
 export function normalizeResultType(value: unknown): ResultType {
   return value === "weather" ||
@@ -31,7 +32,7 @@ export function buildPrompt(opts: {
   query: string;
   priceStr: string;
   weatherSummary: string;
-  language: "hi" | "en";
+  language: SpeechLanguageCode;
   farm?: FarmContext | null;
   instructions?: string;
   history?: { role: "user" | "agent"; text: string }[];
@@ -66,7 +67,7 @@ Use this profile to personalise every recommendation. Always tie advice to the c
 2. price_estimate — a short line describing the current market price picture.
 3. recommendation — a 2-3 sentence plain-language recommendation on when to sell and why.
 4. spoilage_risk — "green", "yellow", or "red" based on weather-driven spoilage risk.
-5. language — "hi" or "en".
+5. language — the language the farmer wrote in, EXACTLY one of "hi", "en", "mr", "bn", "ta", "ur" (Hindi, English, Marathi, Bengali, Tamil, Urdu).
 6. result_type — classify the user's intent as EXACTLY one of: "weather" (forecast/climate), "prices" (market prices), "news" (market news/insights), "buyers" (buyers/mandi opportunities), "calendar" (crop sowing/harvest calendar), "schemes" (MSP/government schemes), or "chat" (general advice or anything else).
 7. follow_up — a short one-line follow-up question in the same language inviting the farmer to go deeper, or "" if nothing.`;
 
@@ -77,7 +78,7 @@ Live market prices per kg: ${priceStr}
 Weather: ${weatherSummary || "weather data unavailable"}
 ${historyBlock}
 ${farmBlock}
-Respond in ${language === "hi" ? "Hindi" : "English"}.
+Respond in ${languageName(language)}.
 
 ${taskBlock}
 
@@ -90,7 +91,7 @@ export async function callAIMLDirect(opts: {
   query: string;
   priceStr: string;
   weatherSummary: string;
-  language: "hi" | "en";
+  language: SpeechLanguageCode;
   apiKey: string;
   farm?: FarmContext | null;
   instructions?: string;
@@ -130,7 +131,7 @@ export async function callAIMLDirect(opts: {
     price_estimate: parsed.price_estimate ?? priceStr,
     recommendation: parsed.recommendation,
     spoilage_risk: risk,
-    language: parsed.language === "hi" ? "hi" : "en",
+    language: isSpeechLanguage(parsed.language) ? parsed.language : language,
     result_type: normalizeResultType(parsed.result_type),
     follow_up: parsed.follow_up ?? "",
   };
@@ -140,7 +141,7 @@ export async function callAIMLDirect(opts: {
 export async function getAIResponse(opts: {
   query: string;
   weatherSummary: string;
-  language: "hi" | "en";
+  language: SpeechLanguageCode;
   apiKey: string;
   farm?: FarmContext | null;
   lat?: number;
@@ -169,6 +170,7 @@ export async function getAIResponse(opts: {
   const { data, error } = await supabase.functions.invoke("recommend-crop", {
     body: {
       query,
+      language,
       location: {
         lat: lat ?? 27.1767,
         lon: lon ?? 78.0081,
@@ -192,7 +194,7 @@ export async function getAIResponse(opts: {
         : raw?.spoilage_risk === "green"
           ? "green"
           : "yellow",
-    language: raw?.language === "hi" ? "hi" : "en",
+    language: isSpeechLanguage(raw?.language) ? raw.language : language,
     result_type: normalizeResultType(raw?.result_type),
     follow_up: raw?.follow_up ?? "",
   };
@@ -200,7 +202,7 @@ export async function getAIResponse(opts: {
 
 /** Fetch a compact weather summary from Open-Meteo for the farm region. */
 export async function fetchWeatherSummary(
-  language: "hi" | "en",
+  language: SpeechLanguageCode,
   location?: string | null,
 ): Promise<{ summary: string; lat: number; lon: number }> {
   const coords = location && /agra|uttar pradesh/i.test(location)

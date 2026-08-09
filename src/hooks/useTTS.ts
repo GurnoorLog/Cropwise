@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
+import { ttsLocale, type SpeechLanguageCode } from "../lib/languages";
 
 interface UseTTSOptions {
-  language: "hi" | "en";
+  language: SpeechLanguageCode;
   onEnd?: () => void;
 }
 
@@ -19,7 +20,7 @@ export function useTTS({ language, onEnd }: UseTTSOptions) {
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = language === "hi" ? "hi-IN" : "en-IN";
+      utterance.lang = ttsLocale(language);
       utterance.rate = 0.9;
       utterance.pitch = 1.0;
 

@@ -7,11 +7,22 @@ const API_KEY = Deno.env.get("AIML_API_KEY") ?? Deno.env.get("OPENAI_API_KEY");
 
 interface RecommendCropBody {
   query?: string;
+  language?: string;
   location?: { lat?: number; lon?: number; district?: string };
   weather?: { summary?: string } | null;
   prices?: { summary?: string };
   history?: { role: "user" | "agent"; text: string }[];
 }
+
+const SUPPORTED_LANGUAGES = ["en", "hi", "mr", "bn", "ta", "ur"] as const;
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English",
+  hi: "Hindi",
+  mr: "Marathi",
+  bn: "Bengali",
+  ta: "Tamil",
+  ur: "Urdu",
+};
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -61,6 +72,11 @@ Deno.serve(async (req: Request) => {
   const weatherSummary = body.weather?.summary ?? "";
   const priceStr = body.prices?.summary ?? "";
   const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
+  const preferredLanguage =
+    typeof body.language === "string" &&
+    (SUPPORTED_LANGUAGES as readonly string[]).includes(body.language)
+      ? body.language
+      : null;
 
   const historyBlock =
     history.length > 0
@@ -75,13 +91,14 @@ Crop query: ${query}
 Location: ${district}
 Live market prices per kg: ${priceStr || "unavailable"}
 Weather: ${weatherSummary || "weather data unavailable"}${historyBlock}
+Farmer's preferred language: ${preferredLanguage ? LANGUAGE_NAMES[preferredLanguage] : "match whatever language the farmer writes in"}
 
 Return ONLY a JSON object with EXACTLY these 7 keys:
 1. weather_summary — one short line on the weather relevant to selling.
 2. price_estimate — one short line on the current market price picture.
 3. recommendation — 2-3 sentences in plain language answering the user's question and advising when to sell and why.
 4. spoilage_risk — EXACTLY one of "green", "yellow", "red" (weather-driven spoilage risk).
-5. language — EXACTLY "hi" if the user wrote in Hindi or Hinglish, otherwise "en".
+5. language — the language of the farmer's question, EXACTLY one of "hi", "en", "mr", "bn", "ta", "ur" (Hindi, English, Marathi, Bengali, Tamil, Urdu). Use the farmer's preferred language if the question is not in any local language (e.g. "What is the best time to sell?").
 6. result_type — pick the SINGLE best category for the user's request:
    - "weather" for forecasts, rain, climate, temperature questions
    - "prices" for market/mandi prices or the price of any crop
@@ -93,8 +110,9 @@ Return ONLY a JSON object with EXACTLY these 7 keys:
    Examples: "when should I sow wheat" -> calendar; "wheat price in Agra" -> prices; "what MSP schemes" -> schemes; "will it rain tomorrow" -> weather; "who buys onions" -> buyers.
 7. follow_up — a short follow-up question (5-10 words) in the same language as the user to continue the conversation. ALWAYS provide one; never empty.
 
+Write weather_summary, price_estimate, recommendation, and follow_up ALL in the language of the farmer's question (or the preferred language).
 Respond with ONLY valid JSON in EXACTLY this shape:
-{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en","result_type":"calendar","follow_up":"..."}`;
+{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"hi","result_type":"calendar","follow_up":"..."}`;
 
   try {
     const res = await fetch(AI_ENDPOINT, {
@@ -167,11 +185,22 @@ Respond with ONLY valid JSON in EXACTLY this shape:
                     : null;
 
     const resultType = keywordType ?? modelType;
-    const language = /[\u0900-\u097F]/.test(query)
-      ? "hi"
-      : parsed.language === "hi"
-        ? "hi"
-        : "en";
+
+    // Detect the language from the writing system first (strongest signal),
+    // then fall back to the farmer's stored preference, then the model's guess.
+    const scriptLanguage = /[\u0900-\u097F]/.test(query)
+      ? "hi" // Devanagari — Hindi (also used by Marathi)
+      : /[\u0B80-\u0BFF]/.test(query)
+        ? "ta" // Tamil script
+        : /[\u0980-\u09FF]/.test(query)
+          ? "bn" // Bengali script
+          : /[\u0600-\u06FF]/.test(query)
+            ? "ur" // Arabic script — Urdu
+            : null;
+    const language =
+      scriptLanguage ??
+      preferredLanguage ??
+      (parsed.language === "hi" ? "hi" : "en");
 
     return corsResponse({
       weather_summary: (parsed.weather_summary as string) ?? weatherSummary,

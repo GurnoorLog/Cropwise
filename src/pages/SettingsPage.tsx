@@ -16,17 +16,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { getProfile, saveProfile, setFarmCrops, getFarmCrops, type Profile } from "../lib/profile";
+import { LANGUAGES, languageLabel } from "../lib/languages";
 import UserMenu from "../components/UserMenu";
 import MobileNav from "../components/MobileNav";
-
-const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "hi", label: "हिन्दी (Hindi)" },
-  { code: "mr", label: "मराठी (Marathi)" },
-  { code: "pa", label: "ਪੰਜਾਬੀ (Punjabi)" },
-  { code: "te", label: "తెలుగు (Telugu)" },
-  { code: "ta", label: "தமிழ் (Tamil)" },
-];
 
 const FARM_TYPES = ["Vegetable", "Specialty", "Fruit", "Mixed"];
 const IRRIGATION = ["Drip", "Sprinkler", "Flood", "Rain-fed"];
@@ -445,7 +437,7 @@ export default function SettingsPage() {
                     >
                       {LANGUAGES.map((l) => (
                         <option key={l.code} value={l.code}>
-                          {l.label}
+                          {languageLabel(l.code)}
                         </option>
                       ))}
                     </select>
