@@ -178,6 +178,9 @@ export default function DashboardPage() {
               <Link to="/dashboard" className={navLink(true)}>
                 Overview
               </Link>
+              <Link to="/weather" className={navLink(false)}>
+                Weather
+              </Link>
               <Link to="/news" className={navLink(false)}>
                 Forecasts
               </Link>

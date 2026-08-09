@@ -47,3 +47,59 @@ The target page is `src/pages/DashboardPage.tsx`. The fetched design is **alread
 2. Added scrollbar/`overflow-x` CSS to `src/index.css`. ✅
 3. Added NewsPage (`/news`) + Voice Agent redesign (`/app`), wired dashboard nav; `tsc` + `vite build` pass. ✅
 4. Commit + push; Vercel auto-deploys. (pending commit)
+
+---
+
+# Implementation Plan — Harvest Window | Intelligence Weather Dashboard
+
+Design source: SuperDesign draft `c1394c59-290e-4d7e-a350-f333cbf60529` (project `9689772b-7ec0-4c96-a92e-5935019d6cdc`)
+Design fetched: `Harvest Window | Intelligence Weather Dashboard` → `C:\Users\tambe\AppData\Local\Temp\harvest-window-weather-draft.html`
+Init context: `.superdesign/init/*.md` (components, layouts, routes, theme, pages, extractable-components)
+Repo: `C:\Users\tambe\Downloads\CropWise-source-code`
+
+## Requirements from user
+
+> "For weather use this page UI. Remember no hardcoded real-time data — use the location where the user tells."
+
+- Build a dedicated **Weather Dashboard** page implementing the design **1:1** (sticky nav, alert banner, current conditions hero, 24h trend bars, 7-day forecast grid, Farming Impact card, atmospheric grid, footer).
+- **No hardcoded weather values.** Every number is fetched live from **Open-Meteo** for the **user's farm location** (read from `profiles.farm_location` in Supabase, e.g. "Agra" → geocode to `27.18, 78.01`). If the profile has no location, fall back to the browser's geolocation, then to a neutral default.
+- Location pill in the nav shows the resolved farm location (not a hardcoded city).
+
+## Deliverables
+
+### 1. New route `/weather`
+- `src/App.tsx`: add `<Route path="/weather" element={<Protected><WeatherPage /></Protected>} />`.
+- Nav wiring:
+  - `DashboardPage.tsx` + `NewsPage.tsx`: add a **Weather** link → `/weather` (keep Overview → `/dashboard`, Forecasts → `/news`).
+  - `MobileNav.tsx`: replace `Forecasts` icon with **Weather** → `/weather` (or add a 5th item), label "Weather", icon `CloudSun`.
+- `index.html` title → `Harvest Window | Weather`.
+
+### 2. New data layer `src/lib/weather.ts`
+- `geocodeLocation(location: string)` → Open-Meteo geocoding API (`https://geocoding-api.open-meteo.com/v1/search?name=<loc>&count=1&language=en&format=json`) → `{ name, latitude, longitude, admin1 }`.
+- `fetchWeather(lat, lon)` → Open-Meteo forecast (`current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,weather_code,precipitation,pressure_msl,visibility,dew_point_2m&hourly=temperature_2m,weather_code,precipitation_probability,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,uv_index_max,wind_speed_10m_max&timezone=auto&forecast_days=7`).
+- `weatherCodeMeta(code, lang)` → `{ desc, icon }` mapping (WMO codes → lucide icon: Sun/CloudSun/Cloud/CloudDrizzle/CloudRain/CloudSnow/CloudLightning/Fog) — bilingual hi/en, mirrors the existing `weatherCodeToDesc` helper in `AdvisorPage`.
+- `fetchFarmWeather(userId)` → convenience wrapper: `getProfile(userId)` → `geocodeLocation(farm_location)` → `fetchWeather(lat, lon)` → returns `{ locationLabel, coords, weather }`.
+- **No hardcoded temperatures/conditions anywhere** — only fallbacks for shape (e.g. empty array → skeleton).
+
+### 3. New page `src/pages/WeatherPage.tsx` (design 1:1)
+- Shell: video bg (`video-overlay-dashboard`) + sticky nav (brand → `/dashboard`; links Overview `/dashboard`, **Weather** active, Markets `/news`; right = location pill w/ `MapPin` + `ChevronDown`, refresh `RefreshCw` button, avatar block via `UserMenu`).
+- Sections (each with `fade-rise stagger-*`):
+  1. **Alert banner** (amber, `border-l-6 border-amber-500`, `AlertTriangle` icon, severity badge, description, Duration + "Deploy Countermeasures" button) — **derived from live data**: frost advisory if `daily.temperature_2m_min[0]` ≤ 4°C, heavy rain if `precipitation_probability_max[0]` ≥ 60, high wind if `wind_speed_10m_max[0]` ≥ 40. Hidden when no condition triggers.
+  2. **Current Conditions hero** (`weather-card p-10`): "Current Intelligence" label, big serif temp + condition desc, Feels Like / Humidity / Wind (km/h + direction) / UV index (from `uv_index_max[0]`); right side = **24-Hour Temperature Trend** bar chart from `hourly.temperature_2m` (12 bars), labels 06:00/12:00/18:00/00:00.
+  3. **7-Day Forecast** (`lg:col-span-2`): 7 day cells — day name (from `daily.time`), icon (by `weather_code`), high/low (from `temperature_2m_max/min`), hover → black.
+  4. **Farming Impact** (black card): Irrigation Need (Low if `precipitation_probability_max` low, else Elevated), Pest Risk Score (Moderate when humidity high, else Low), Harvest Readiness (Peak Window Reaching when next days clear), "View Full Advisory" → `/app`.
+  5. **Atmospheric grid** (4 cards): Precipitation chance (`precipitation_probability_max[0]`), Visibility (`visibility` km), Pressure (`pressure_msl` mb), Dew Point (`dew_point_2m`).
+  6. Footer: `© 2024 HARVEST WINDOW INTELLIGENCE`.
+- Loading skeleton (`Loader2` centered) while fetching; error state with "Try Again".
+
+### 4. CSS additions (`src/index.css`)
+- `.weather-card` (mirror `.card-glass`: rgba white 0.95, blur 12px, radius 24px, hover lift) + `.chart-container` / `.chart-bar` / `.line-indicator` styles from the design.
+
+## Verification
+1. `npx tsc --noEmit` + `npm run build` pass.
+2. Manual: sign in → Dashboard → Weather → confirm live Agra data, location pill, alert banner only when conditions trigger, 7-day + 24h charts populated, mobile nav shows Weather.
+3. Commit + push; Vercel auto-deploys.
+
+## Out of scope
+- Multi-location switcher / regional comparison (design mentions it; single farm location only for now).
+- F/C unit toggle, inHg/mm toggles, monthly/seasonal selectors — keep °C/km/mb (app is India-focused).

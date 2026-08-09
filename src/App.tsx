@@ -16,6 +16,7 @@ import DashboardPage from "./pages/DashboardPage";
 import NewsPage from "./pages/NewsPage";
 import SettingsPage from "./pages/SettingsPage";
 import OnboardingPage from "./pages/OnboardingPage";
+import WeatherPage from "./pages/WeatherPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -52,6 +53,14 @@ function AppRoutes() {
         element={
           <Protected>
             <DashboardPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/weather"
+        element={
+          <Protected>
+            <WeatherPage />
           </Protected>
         }
       />

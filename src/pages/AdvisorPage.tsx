@@ -2,12 +2,12 @@ import { useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Mic, X, Languages, RefreshCw, Volume2, Keyboard, Bot } from "lucide-react";
 
-import { supabase } from "../supabase";
 import { useAuth } from "../lib/auth";
 import { getApiKey } from "../lib/apiKeys";
+import { getProfile, getFarmCrops } from "../lib/profile";
 import { useSpeechmatics } from "../hooks/useSpeechmatics";
 import { useTTS } from "../hooks/useTTS";
-import { fetchMarketPrices, formatPrices } from "../data/prices";
+import { getAIResponse, type FarmContext } from "../lib/ai";
 import TextInput from "../components/TextInput";
 import UserMenu from "../components/UserMenu";
 import type { AIResponse } from "../components/ResponseCard";
@@ -15,9 +15,6 @@ import type { AIResponse } from "../components/ResponseCard";
 type AdvisorStep = "idle" | "recording" | "connecting" | "thinking" | "result" | "error";
 
 type AgentState = "listening" | "processing" | "speaking" | "ready";
-
-const AI_MODEL = "gpt-4o-mini";
-const AI_ENDPOINT = "https://api.aimlapi.com/v1/chat/completions";
 
 const SUGGESTIONS = [
   "Market Prices",
@@ -47,68 +44,6 @@ const STATE_CLASS: Record<AgentState, string> = {
 };
 
 /** Call the AI/ML API directly from the browser using a user-provided key */
-async function callAIMLDirect(opts: {
-  query: string;
-  priceStr: string;
-  weatherSummary: string;
-  language: "hi" | "en";
-  apiKey: string;
-}): Promise<AIResponse> {
-  const { query, priceStr, weatherSummary, language, apiKey } = opts;
-
-  const prompt = `You are Harvest Window, helping a farmer decide when to sell their crop. Here is the data:
-
-Crop query: ${query}
-Live market prices per kg: ${priceStr}
-Weather: ${weatherSummary || "weather data unavailable"}
-
-Respond in ${language === "hi" ? "Hindi" : "English"}.
-
-Write:
-1. weather_summary — a short one-line summary of the weather relevant to selling.
-2. price_estimate — a short line describing the current market price picture.
-3. recommendation — a 2-3 sentence plain-language recommendation on when to sell and why.
-4. spoilage_risk — "green", "yellow", or "red" based on weather-driven spoilage risk.
-5. language — "hi" or "en".
-
-Respond with ONLY valid JSON in exactly this shape:
-{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en"}`;
-
-  const res = await fetch(AI_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.6,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`AI request failed (${res.status}): ${text.slice(0, 200)}`);
-  }
-
-  const json = await res.json();
-  const content: string = json?.choices?.[0]?.message?.content ?? "";
-  const match = content.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("AI returned an unreadable response");
-
-  const parsed = JSON.parse(match[0]) as Partial<AIResponse>;
-  if (!parsed.recommendation) throw new Error("AI returned an incomplete response");
-
-  const risk = parsed.spoilage_risk === "red" ? "red" : parsed.spoilage_risk === "green" ? "green" : "yellow";
-  return {
-    weather_summary: parsed.weather_summary ?? weatherSummary,
-    price_estimate: parsed.price_estimate ?? priceStr,
-    recommendation: parsed.recommendation,
-    spoilage_risk: risk,
-    language: parsed.language === "hi" ? "hi" : "en",
-  };
-}
 
 export default function AdvisorPage() {
   const [language, setLanguage] = useState<"hi" | "en">("hi");
@@ -122,8 +57,27 @@ export default function AdvisorPage() {
   const { user } = useAuth();
   const weatherRef = useRef<any>(null);
   const queryRef = useRef("");
+  const farmRef = useRef<FarmContext | null>(null);
 
   const { speak, isSpeaking } = useTTS({ language });
+
+  const buildFarmContext = useCallback(async (): Promise<FarmContext | null> => {
+    if (farmRef.current) return farmRef.current;
+    if (!user) return null;
+    const [profile, crops] = await Promise.all([getProfile(user.id), getFarmCrops(user.id)]);
+    if (!profile) return null;
+    farmRef.current = {
+      farmName: profile.farm_name || "Unnamed farm",
+      location: profile.farm_location || "India",
+      farmType: profile.farm_type || "not set",
+      size: `${profile.farm_size ?? "?"} ${profile.farm_size_unit || "acres"}`,
+      irrigation: profile.irrigation_method || "not set",
+      storage: profile.storage_facilities?.length ? profile.storage_facilities.join(", ") : "none",
+      crops: crops.length ? crops.join(", ") : "not set",
+      language: profile.language || "en",
+    };
+    return farmRef.current;
+  }, [user]);
 
   const agentState: AgentState =
     step === "recording"
@@ -194,9 +148,14 @@ export default function AdvisorPage() {
           }
         },
         async () => {
-          // Fallback: Pune, Maharashtra
+          // Fallback: farm location if known, else Pune, Maharashtra
           try {
-            const weather = await fetchForecast(18.52, 73.85);
+            const farm = await buildFarmContext();
+            const fallback =
+              farm?.location && /agra|uttar pradesh/i.test(farm.location)
+                ? { lat: 27.1767, lon: 78.0081 }
+                : { lat: 18.52, lon: 73.85 };
+            const weather = await fetchForecast(fallback.lat, fallback.lon);
             weatherRef.current = weather;
             resolve(weather);
           } catch {
@@ -206,7 +165,7 @@ export default function AdvisorPage() {
         { timeout: 10000 },
       );
     });
-  }, []);
+  }, [buildFarmContext]);
 
   /** Build the AI recommendation — direct API if a key is set, else the Edge Function */
   const getAIRecommendation = useCallback(
@@ -216,8 +175,8 @@ export default function AdvisorPage() {
       setFinalText(query);
 
       try {
+        const farm = await buildFarmContext();
         const weather = await fetchWeather();
-        const prices = await fetchMarketPrices();
 
         let weatherSummary = "";
         if (weather?.daily) {
@@ -233,34 +192,18 @@ export default function AdvisorPage() {
           if (precip > 0) weatherSummary += `, ${language === "hi" ? "बारिश" : "rain"} ${precip}mm`;
         }
 
-        const priceStr = formatPrices(prices);
         const aiKey = getApiKey("ai");
 
-        let aiResponse: AIResponse;
-        if (aiKey) {
-          aiResponse = await callAIMLDirect({
-            query,
-            priceStr,
-            weatherSummary,
-            language,
-            apiKey: aiKey,
-          });
-        } else {
-          const { data, error } = await supabase.functions.invoke("recommend-crop", {
-            body: {
-              query,
-              location: {
-                lat: weather?.latitude ?? 18.52,
-                lon: weather?.longitude ?? 73.85,
-                district: "Pune",
-              },
-              weather: weatherSummary ? { summary: weatherSummary } : null,
-              prices: { summary: priceStr },
-            },
-          });
-          if (error) throw new Error(error.message || "AI request failed");
-          aiResponse = data as AIResponse;
-        }
+        const aiResponse = await getAIResponse({
+          query,
+          weatherSummary,
+          language,
+          apiKey: aiKey,
+          farm,
+          lat: weather?.latitude ?? 18.52,
+          lon: weather?.longitude ?? 73.85,
+          district: farm?.location ?? "Pune",
+        });
 
         setResponse(aiResponse);
         setStep("result");
@@ -288,7 +231,7 @@ export default function AdvisorPage() {
         setStep("error");
       }
     },
-    [language, fetchWeather, weatherCodeToDesc],
+    [language, fetchWeather, weatherCodeToDesc, buildFarmContext],
   );
 
   /** Handle mic button tap */

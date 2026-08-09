@@ -88,12 +88,16 @@ export function useSpeechmatics({
     if (apiKey) {
       const res = await fetch("https://mp.speechmatics.com/v1/api_keys?type=rt", {
         method: "POST",
-        headers: { Authorization: `Basic ${btoa(`${apiKey}:`)}` },
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ttl: 60 }),
       });
       if (!res.ok) throw new Error(`Speechmatics token request failed (${res.status})`);
       const json = await res.json();
-      if (!json?.key) throw new Error("No token returned from Speechmatics");
-      return json.key as string;
+      if (!json?.key_value) throw new Error("No token returned from Speechmatics");
+      return json.key_value as string;
     }
 
     const { data, error } = await supabase.functions.invoke("speechmatics-token");

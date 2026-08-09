@@ -229,6 +229,12 @@ export default function NewsPage() {
             <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
               Harvest Window
             </Link>
+            <Link
+              to="/weather"
+              className="hidden lg:inline-flex text-white/60 hover:text-white text-xs font-medium uppercase tracking-wider transition-colors"
+            >
+              Weather
+            </Link>
             <div className="hidden lg:flex gap-1">
               {FILTERS.map((f) => (
                 <button

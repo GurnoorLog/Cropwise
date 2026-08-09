@@ -12,8 +12,8 @@ const FEEDS: Array<{ url: string; source: string }> = [
     source: "The Hindu",
   },
   {
-    url: "https://www.livemint.com/rss/companies",
-    source: "Mint",
+    url: "https://agriculturepost.com/feed/",
+    source: "Agriculture Post",
   },
   {
     url: "https://www.farmprogress.com/rss.xml",
@@ -23,19 +23,50 @@ const FEEDS: Array<{ url: string; source: string }> = [
     url: "https://www.agdaily.com/feed/",
     source: "AGDAILY",
   },
-  {
-    url: "http://feeds.bbci.co.uk/news/business/rss.xml",
-    source: "BBC News",
-  },
 ];
+
+// Terms that make a story crop/farming-relevant. At least one must match
+// the title or summary, otherwise the story is discarded.
+const AGRI_KEYWORDS = [
+  "farmer", "farming", "farm", "agriculture", "agricultural", "agri",
+  "crop", "crops", "harvest", "yield", "yields", "cultivation", "sowing",
+  "plantation", "irrigation", "fertilizer", "fertiliser", "pesticide",
+  "herbicide", "seed", "seeds", "soil", "monsoon", "kharif", "rabi",
+  "mandi", "msp", "agro", "horticulture", "horticultural", "organic",
+  "produce", "grower", "growers", "agronomist", "entomology",
+  "wheat", "rice", "paddy", "maize", "corn", "soybean", "soy", "millet",
+  "bajra", "jowar", "pulse", "pulses", "lentil", "gram", "sugarcane",
+  "cotton", "onion", "tomato", "potato", "chilli", "chili", "brinjal",
+  "spinach", "lettuce", "pepper", "mango", "mangoes", "banana",
+  "groundnut", "mustard", "oilseed", "spice", "spices", "turmeric",
+  "ginger", "garlic", "coconut", "rubber", "floriculture", "aquaculture",
+  "dairy", "livestock", "poultry", "agritech", "agri-tech", "greenhouse",
+  "polyhouse", "commodity", "commodities", "procurement", "agri-business",
+];
+
+// Obvious non-news fluff to drop even if a keyword matches.
+const IGNORE_TERMS = [
+  "instagram", "best farm photos", "photos of the week", "farm dog",
+  "vote for", "little house", "laura ingalls", "sweet bread",
+  "octagonal barn", "luxury stays", "farmstead", "recipe", "recipes",
+  "squash over", "woodworking", "photo gallery", "photo essay",
+  "letters", "editorial", "op-ed", "horoscope", "puzzle", "crossword",
+  "movie", "tv", "celebrity", "football", "cricket match",
+];
+
+function isRelevant(title: string, summary: string): boolean {
+  const text = `${title} ${summary}`.toLowerCase();
+  if (IGNORE_TERMS.some((t) => text.includes(t))) return false;
+  return AGRI_KEYWORDS.some((k) => text.includes(k));
+}
 
 function categorize(title: string): string {
   const t = title.toLowerCase();
-  if (t.includes("price") || t.includes("market") || t.includes("demand") || t.includes("trade") || t.includes("export") || t.includes("commodity"))
+  if (t.includes("price") || t.includes("market") || t.includes("demand") || t.includes("trade") || t.includes("export") || t.includes("commodity") || t.includes("mandi") || t.includes("msp") || t.includes("procurement"))
     return "Markets";
-  if (t.includes("weather") || t.includes("rain") || t.includes("frost") || t.includes("heat") || t.includes("drought") || t.includes("monsoon"))
+  if (t.includes("weather") || t.includes("rain") || t.includes("frost") || t.includes("heat") || t.includes("drought") || t.includes("monsoon") || t.includes("el nino"))
     return "Weather";
-  if (t.includes("harvest") || t.includes("yield") || t.includes("crop") || t.includes("soil") || t.includes("farmer") || t.includes("sugarcane") || t.includes("wheat") || t.includes("rice"))
+  if (t.includes("harvest") || t.includes("yield") || t.includes("crop") || t.includes("soil") || t.includes("farmer") || t.includes("sugarcane") || t.includes("wheat") || t.includes("rice") || t.includes("paddy") || t.includes("millet"))
     return "Insights";
   if (t.includes("buyer") || t.includes("retail") || t.includes("import") || t.includes("supply"))
     return "Buyer Activity";
@@ -134,7 +165,22 @@ Deno.serve(async (req: Request) => {
 
   let inserted = 0;
   if (!fresh) {
-    // 2. Fetch all feeds and dedupe by URL
+    const activeSources = new Set(FEEDS.map((f) => f.source));
+
+    // 2. Purge rows from sources we no longer pull (e.g. legacy Mint/BBC).
+    const activeList = [...activeSources].map((s) => `"${s}"`).join(",");
+    const { data: stale } = await supabase
+      .from("news")
+      .select("id")
+      .not("source", "in", `(${activeList})`);
+    if (stale && stale.length > 0) {
+      await supabase.from("news").delete().in(
+        "id",
+        stale.map((r) => r.id),
+      );
+    }
+
+    // 3. Fetch all feeds, keep only crop/farming-relevant stories, dedupe by URL
     const seen = new Set<string>();
     const rows: Array<{
       title: string;
@@ -145,6 +191,7 @@ Deno.serve(async (req: Request) => {
       published_at: string;
       is_placeholder: boolean;
     }> = [];
+    let feedOk = 0;
 
     for (const feed of FEEDS) {
       try {
@@ -155,10 +202,12 @@ Deno.serve(async (req: Request) => {
           },
         });
         if (!res.ok) continue;
+        feedOk += 1;
         const xml = await res.text();
         const items = parseRss(xml);
         for (const it of items) {
           if (seen.has(it.link)) continue;
+          if (!isRelevant(it.title, it.summary)) continue;
           seen.add(it.link);
           rows.push({
             title: it.title,
@@ -185,6 +234,28 @@ Deno.serve(async (req: Request) => {
       } else {
         inserted = rows.length;
       }
+
+      // If every feed responded, do a full refresh so the table only ever
+      // contains stories that pass the current relevance filter. Doing this
+      // with a chunked URL-based delete avoids PostgREST URL-length limits.
+      if (feedOk === FEEDS.length) {
+        const { data: all, error: allErr } = await supabase
+          .from("news")
+          .select("id,url");
+        if (!allErr && all && all.length > 0) {
+          const keep = new Set(rows.map((r) => r.url));
+          const drop = all.filter((r) => !keep.has(r.url));
+          for (let i = 0; i < drop.length; i += 300) {
+            await supabase
+              .from("news")
+              .delete()
+              .in(
+                "id",
+                drop.slice(i, i + 300).map((r) => r.id),
+              );
+          }
+        }
+      }
     }
 
     const { error: metaErr } = await supabase.from("sync_meta").upsert(
@@ -194,12 +265,12 @@ Deno.serve(async (req: Request) => {
     if (metaErr) console.error("sync_meta upsert error", metaErr.message);
   }
 
-  // 3. Drop placeholder rows once we have real articles
+  // 4. Drop placeholder rows once we have real articles
   if (inserted > 0) {
     await supabase.from("news").delete().eq("is_placeholder", true);
   }
 
-  // 4. Serve the freshest real stories (fall back to placeholders if none yet)
+  // 5. Serve the freshest real stories (fall back to placeholders if none yet)
   const { data: news } = await supabase
     .from("news")
     .select("*")
