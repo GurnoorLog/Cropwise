@@ -12,18 +12,35 @@ interface RecommendCropBody {
   prices?: { summary?: string };
 }
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+function corsResponse(body: unknown, status = 200): Response {
+  return new Response(typeof body === "string" ? body : JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
+
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return corsResponse({ error: "Method not allowed" }, 405);
   }
 
   if (!API_KEY) {
-    return new Response(
-      JSON.stringify({
+    return corsResponse(
+      {
         error:
-          "No server AI key configured. Add your own AI/ML key in Settings and try again.",
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+          "No server AI key configured. Add AIML_API_KEY to the Supabase Edge Function secrets.",
+      },
+      500,
     );
   }
 
@@ -31,18 +48,12 @@ Deno.serve(async (req: Request) => {
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return corsResponse({ error: "Invalid JSON body" }, 400);
   }
 
   const query = body.query?.trim() ?? "";
   if (!query) {
-    return new Response(JSON.stringify({ error: "Missing query" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return corsResponse({ error: "Missing query" }, 400);
   }
 
   const district = body.location?.district ?? "Pune";
@@ -82,11 +93,11 @@ Respond with ONLY valid JSON in exactly this shape:
 
     if (!res.ok) {
       const text = await res.text();
-      return new Response(
-        JSON.stringify({
+      return corsResponse(
+        {
           error: `AI request failed (${res.status}): ${text.slice(0, 200)}`,
-        }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
+        },
+        502,
       );
     }
 
@@ -94,9 +105,9 @@ Respond with ONLY valid JSON in exactly this shape:
     const content: string = json?.choices?.[0]?.message?.content ?? "";
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) {
-      return new Response(
-        JSON.stringify({ error: "AI returned an unreadable response" }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
+      return corsResponse(
+        { error: "AI returned an unreadable response" },
+        502,
       );
     }
 
@@ -108,22 +119,19 @@ Respond with ONLY valid JSON in exactly this shape:
           ? "green"
           : "yellow";
 
-    return new Response(
-      JSON.stringify({
-        weather_summary: (parsed.weather_summary as string) ?? weatherSummary,
-        price_estimate: (parsed.price_estimate as string) ?? priceStr,
-        recommendation: (parsed.recommendation as string) ?? "",
-        spoilage_risk: risk,
-        language: parsed.language === "hi" ? "hi" : "en",
-      }),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    return corsResponse({
+      weather_summary: (parsed.weather_summary as string) ?? weatherSummary,
+      price_estimate: (parsed.price_estimate as string) ?? priceStr,
+      recommendation: (parsed.recommendation as string) ?? "",
+      spoilage_risk: risk,
+      language: parsed.language === "hi" ? "hi" : "en",
+    });
   } catch (err) {
-    return new Response(
-      JSON.stringify({
+    return corsResponse(
+      {
         error: err instanceof Error ? err.message : "Unexpected error",
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      },
+      500,
     );
   }
 });

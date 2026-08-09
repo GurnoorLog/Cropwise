@@ -94,7 +94,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col isolate bg-[hsl(201,100%,13%)]">
+    <div className="relative min-h-screen w-full flex flex-col isolate bg-[#171310]">
       {/* Background Video Layer */}
       <div className="fixed inset-0 w-full h-full -z-20 overflow-hidden">
         <video autoPlay muted loop playsInline className="w-full h-full object-cover">

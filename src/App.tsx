@@ -14,7 +14,8 @@ import AuthCallbackPage from "./pages/AuthCallbackPage";
 import AdvisorPage from "./pages/AdvisorPage";
 import DashboardPage from "./pages/DashboardPage";
 import NewsPage from "./pages/NewsPage";
-import ApiKeysPage from "./pages/ApiKeysPage";
+import SettingsPage from "./pages/SettingsPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import { Loader2 } from "lucide-react";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -22,7 +23,7 @@ function Protected({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[hsl(201,100%,13%)]">
+      <div className="min-h-screen flex items-center justify-center bg-[#171310]">
         <Loader2 className="w-8 h-8 animate-spin text-white/60" />
       </div>
     );
@@ -66,7 +67,15 @@ function AppRoutes() {
         path="/settings"
         element={
           <Protected>
-            <ApiKeysPage />
+            <SettingsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path="/onboarding"
+        element={
+          <Protected>
+            <OnboardingPage />
           </Protected>
         }
       />

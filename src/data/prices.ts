@@ -1,3 +1,5 @@
+import { SUPABASE_URL } from "../supabase";
+
 export interface CropPrice {
   crop: string;
   nameHi: string;
@@ -43,4 +45,37 @@ export function formatPrices(prices: CropPrice[]): string {
   return prices
     .map((p) => `${p.crop} (${p.nameHi}): ${p.minPrice}-${p.maxPrice}${p.unit}`)
     .join("; ");
+}
+
+interface MarketPriceRow {
+  crop: string;
+  crop_hi: string | null;
+  market: string | null;
+  min_price: number;
+  max_price: number;
+  unit: string | null;
+}
+
+/**
+ * Fetch live prices from the `prices-sync` edge function (Agmarknet if a
+ * server key is configured, otherwise the baseline table). Falls back to
+ * seasonal local data if the network request fails.
+ */
+export async function fetchMarketPrices(): Promise<CropPrice[]> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/prices-sync`);
+    if (!res.ok) throw new Error(`prices-sync ${res.status}`);
+    const json = await res.json();
+    const rows = (json?.prices ?? []) as MarketPriceRow[];
+    if (rows.length === 0) throw new Error("no prices");
+    return rows.map((r) => ({
+      crop: r.crop,
+      nameHi: r.crop_hi ?? r.crop,
+      minPrice: Number(r.min_price),
+      maxPrice: Number(r.max_price),
+      unit: r.unit ?? "₹/kg",
+    }));
+  } catch {
+    return getAdjustedPrices();
+  }
 }

@@ -1,14 +1,15 @@
 import { useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Mic, Settings, X, Languages, LogOut, RefreshCw, Volume2, Keyboard } from "lucide-react";
+import { Mic, X, Languages, RefreshCw, Volume2, Keyboard, Bot } from "lucide-react";
 
 import { supabase } from "../supabase";
 import { useAuth } from "../lib/auth";
 import { getApiKey } from "../lib/apiKeys";
 import { useSpeechmatics } from "../hooks/useSpeechmatics";
 import { useTTS } from "../hooks/useTTS";
-import { getAdjustedPrices, formatPrices } from "../data/prices";
+import { fetchMarketPrices, formatPrices } from "../data/prices";
 import TextInput from "../components/TextInput";
+import UserMenu from "../components/UserMenu";
 import type { AIResponse } from "../components/ResponseCard";
 
 type AdvisorStep = "idle" | "recording" | "connecting" | "thinking" | "result" | "error";
@@ -118,7 +119,7 @@ export default function AdvisorPage() {
   const [finalText, setFinalText] = useState("");
   const [showTextInput, setShowTextInput] = useState(false);
 
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const weatherRef = useRef<any>(null);
   const queryRef = useRef("");
 
@@ -216,7 +217,7 @@ export default function AdvisorPage() {
 
       try {
         const weather = await fetchWeather();
-        const prices = getAdjustedPrices();
+        const prices = await fetchMarketPrices();
 
         let weatherSummary = "";
         if (weather?.daily) {
@@ -369,7 +370,7 @@ export default function AdvisorPage() {
   const showWaveform = step === "recording" || step === "connecting" || step === "thinking";
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center isolate overflow-hidden bg-[hsl(201,100%,13%)]">
+    <div className="min-h-screen relative flex flex-col items-center justify-center isolate overflow-hidden bg-[#171310]">
       {/* Background Video Layer */}
       <div className="fixed inset-0 w-full h-full -z-20 overflow-hidden">
         <video autoPlay muted loop playsInline className="w-full h-full object-cover">
@@ -383,18 +384,30 @@ export default function AdvisorPage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 px-8 py-6 flex justify-between items-center">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-8">
           <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
             Harvest Window
           </Link>
-          <Link
-            to="/news"
-            className="hidden md:inline-flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold uppercase tracking-wider bg-white/10 border border-white/10 text-white/80 hover:bg-white hover:text-black transition-all"
-          >
-            Forecasts
-          </Link>
+          <div className="hidden md:flex items-center gap-5 text-sm font-medium">
+            <Link to="/dashboard" className="text-white/60 hover:text-white transition-colors">
+              Overview
+            </Link>
+            <Link to="/news" className="text-white/60 hover:text-white transition-colors">
+              Forecasts
+            </Link>
+            <Link to="/news" className="text-white/60 hover:text-white transition-colors">
+              Buyers
+            </Link>
+          </div>
         </div>
         <div className="flex items-center gap-4">
+          <Link
+            to="/app"
+            className="hidden md:inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-white/90 hover:scale-105 active:scale-95 transition-all"
+          >
+            <Bot className="w-3.5 h-3.5" />
+            Ask AI Agent
+          </Link>
           <button
             onClick={toggleLanguage}
             aria-label={`Switch to ${language === "hi" ? "English" : "Hindi"}`}
@@ -404,20 +417,10 @@ export default function AdvisorPage() {
             <Languages className="w-5 h-5" />
             {language === "hi" ? "हिं" : "EN"}
           </button>
-          <Link to="/settings" aria-label="Settings" title="Settings" className={iconButton}>
-            <Settings className="w-5 h-5" />
-          </Link>
-          <button
-            onClick={signOut}
-            aria-label="Sign out"
-            title="Sign out"
-            className={iconButton}
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
           <Link to="/dashboard" aria-label="Close" title="Close" className={iconButton}>
             <X className="w-5 h-5" />
           </Link>
+          <UserMenu size="sm" />
         </div>
       </nav>
 

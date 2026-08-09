@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../supabase";
+import { ensureProfile } from "../lib/profile";
 import { Loader2 } from "lucide-react";
 
 export default function AuthCallbackPage() {
@@ -22,13 +23,14 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      navigate("/dashboard", { replace: true });
+      const profile = await ensureProfile(data.session.user);
+      navigate(profile?.onboarded ? "/dashboard" : "/onboarding", { replace: true });
     };
     handle();
   }, [navigate, params]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[hsl(201,100%,13%)] text-white">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#171310] text-white">
       {error ? (
         <>
           <p className="font-serif text-2xl mb-1">Sign-in failed</p>
