@@ -4,6 +4,7 @@ import { Check, Loader2, MapPin, Phone, Mail, Sprout } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { ensureProfile, getProfile, saveProfile, setFarmCrops } from "../lib/profile";
 import { LANGUAGES, languageName } from "../lib/languages";
+import LocationInput from "../components/LocationInput";
 
 const TOTAL_STEPS = 6;
 
@@ -255,10 +256,9 @@ export default function OnboardingPage() {
                   </div>
                   <div>
                     <label className={labelClassSmall}>Location</label>
-                    <input
-                      type="text"
+                    <LocationInput
                       value={location}
-                      onChange={(e) => setLocation(e.target.value)}
+                      onChange={setLocation}
                       placeholder="e.g. Agra, Uttar Pradesh"
                       className={inputClass}
                     />

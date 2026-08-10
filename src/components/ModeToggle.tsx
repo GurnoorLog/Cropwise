@@ -1,34 +1,23 @@
-import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Bot } from "lucide-react";
 
 export type AppMode = "dashboard" | "agent";
-
-export function getStoredMode(): AppMode {
-  try {
-    return localStorage.getItem("hw.mode") === "agent" ? "agent" : "dashboard";
-  } catch {
-    return "dashboard";
-  }
-}
 
 interface ModeToggleProps {
   compact?: boolean;
 }
 
 export default function ModeToggle({ compact = false }: ModeToggleProps) {
-  const [mode, setMode] = useState<AppMode>(getStoredMode);
+  const { pathname } = useLocation();
   const navigate = useNavigate();
+  // Route-driven: /app => agent mode, everything else => dashboard mode.
+  // On first login the user lands on /dashboard, so dashboard is the default.
+  const mode: AppMode = pathname.startsWith("/app") ? "agent" : "dashboard";
 
   const select = useCallback(
     (next: AppMode) => {
       if (next === mode) return;
-      setMode(next);
-      try {
-        localStorage.setItem("hw.mode", next);
-      } catch {
-        // ignore storage errors
-      }
       navigate(next === "agent" ? "/app" : "/dashboard");
     },
     [mode, navigate],

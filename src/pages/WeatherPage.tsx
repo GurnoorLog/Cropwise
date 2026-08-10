@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { MapPin, ChevronDown, RefreshCw } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { fetchFarmWeather, type FarmWeather } from "../lib/weather";
 import WeatherResult from "../components/results/WeatherResult";
 import MobileNav from "../components/MobileNav";
-import UserMenu from "../components/UserMenu";
+import AppNav from "../components/AppNav";
 
 export default function WeatherPage() {
   const { user } = useAuth();
@@ -45,47 +44,9 @@ export default function WeatherPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/10 backdrop-blur-md bg-transparent">
-        <div className="max-w-[1400px] mx-auto px-8 py-5 flex justify-between items-center">
-          <div className="flex items-center gap-10">
-            <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
-              Harvest Window
-            </Link>
-            <div className="hidden md:flex gap-8 items-center text-white/60">
-              <Link
-                to="/dashboard"
-                className="text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
-              >
-                Overview
-              </Link>
-              <Link
-                to="/weather"
-                className="text-xs font-bold uppercase tracking-widest text-white"
-              >
-                Weather
-              </Link>
-              <Link
-                to="/news"
-                className="text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
-              >
-                Markets
-              </Link>
-              <Link
-                to="/calendar"
-                className="text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
-              >
-                Calendar
-              </Link>
-              <Link
-                to="/schemes"
-                className="text-xs font-bold uppercase tracking-widest hover:text-white transition-all"
-              >
-                Schemes
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
+      <AppNav
+        right={
+          <>
             <div
               className="hidden md:flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-full cursor-pointer hover:bg-white/10 transition-all"
               title="Farm location"
@@ -103,10 +64,9 @@ export default function WeatherPage() {
             >
               <RefreshCw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} />
             </button>
-            <UserMenu size="sm" />
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       {/* Main Content */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-8 py-10">

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
-  Bell,
   Check,
   ChevronDown,
   Globe,
@@ -17,8 +15,9 @@ import {
 import { useAuth } from "../lib/auth";
 import { getProfile, saveProfile, setFarmCrops, getFarmCrops, type Profile } from "../lib/profile";
 import { LANGUAGES, languageLabel } from "../lib/languages";
-import UserMenu from "../components/UserMenu";
 import MobileNav from "../components/MobileNav";
+import AppNav from "../components/AppNav";
+import LocationInput from "../components/LocationInput";
 
 const FARM_TYPES = ["Vegetable", "Specialty", "Fruit", "Mixed"];
 const IRRIGATION = ["Drip", "Sprinkler", "Flood", "Rain-fed"];
@@ -158,9 +157,6 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
-  const navLink = (active: boolean) =>
-    `text-sm font-medium transition-colors ${active ? "text-white" : "text-white/60 hover:text-white"}`;
-
   return (
     <div className="min-h-screen relative flex flex-col isolate bg-[#171310]">
       {/* Background Video Layer */}
@@ -175,50 +171,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/10 backdrop-blur-md bg-transparent">
-        <div className="max-w-[1400px] mx-auto px-8 py-5 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
-              Harvest Window
-            </Link>
-            <div className="hidden md:flex items-center gap-7">
-              <Link to="/dashboard" className={navLink(false)}>
-                Overview
-              </Link>
-              <Link to="/weather" className={navLink(false)}>
-                Weather
-              </Link>
-              <Link to="/news" className={navLink(false)}>
-                Markets
-              </Link>
-              <Link to="/calendar" className={navLink(false)}>
-                Calendar
-              </Link>
-              <Link to="/schemes" className={navLink(false)}>
-                Schemes
-              </Link>
-              <Link to="/app" className={navLink(false)}>
-                Ask AI Agent
-              </Link>
-              <Link to="/settings" className={navLink(true)}>
-                Settings
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <button
-              aria-label="Notifications"
-              className="text-white/60 hover:text-white transition-colors cursor-pointer"
-            >
-              <Bell className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <UserMenu subtitle={profile?.farm_name ?? "Premium Estate"} />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNav subtitle={profile?.farm_name ?? "Premium Estate"} />
 
       {/* Main */}
       <main className="flex-1 w-full max-w-[900px] mx-auto px-8 py-10 pb-28">
@@ -324,15 +277,13 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className={labelClass}>Farm Location</label>
-                  <div className="relative">
-                    <MapPin className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                    <input
-                      className={`${fieldClass} pl-10`}
-                      value={farmLocation}
-                      onChange={(e) => setFarmLocation(e.target.value)}
-                      placeholder="Village / district / state"
-                    />
-                  </div>
+                  <LocationInput
+                    value={farmLocation}
+                    onChange={setFarmLocation}
+                    placeholder="Village / district / state"
+                    className={fieldClass}
+                    icon={<MapPin className="w-4 h-4 text-slate-400" />}
+                  />
                 </div>
                 <div>
                   <label className={labelClass}>Farm Type</label>

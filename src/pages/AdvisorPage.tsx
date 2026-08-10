@@ -25,8 +25,7 @@ import { proactiveAlert } from "../lib/agent";
 import { actionFromResultType } from "../lib/agent";
 import type { ConversationTurn } from "../lib/agent";
 import TextInput from "../components/TextInput";
-import UserMenu from "../components/UserMenu";
-import ModeToggle from "../components/ModeToggle";
+import AppNav from "../components/AppNav";
 import AgentResultPanel from "../components/results/AgentResultPanel";
 import type { AIResponse, ResultType } from "../components/ResponseCard";
 
@@ -393,33 +392,9 @@ export default function AdvisorPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/10 backdrop-blur-md bg-transparent">
-        <div className="max-w-[1400px] mx-auto px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
-              Harvest Window
-            </Link>
-            <ModeToggle compact />
-            <div className="hidden lg:flex items-center gap-6 text-xs font-bold uppercase tracking-widest">
-              <Link to="/dashboard" className="text-white/60 hover:text-white transition-all">
-                Overview
-              </Link>
-              <Link to="/weather" className="text-white/60 hover:text-white transition-all">
-                Weather
-              </Link>
-              <Link to="/news" className="text-white/60 hover:text-white transition-all">
-                Markets
-              </Link>
-              <Link to="/calendar" className="text-white/60 hover:text-white transition-all">
-                Calendar
-              </Link>
-              <Link to="/schemes" className="text-white/60 hover:text-white transition-all">
-                Schemes
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
+      <AppNav
+        right={
+          <>
             <div className="inline-flex items-center gap-2">
               <Languages className="w-5 h-5 text-white/60" />
               <select
@@ -442,10 +417,9 @@ export default function AdvisorPage() {
             <Link to="/dashboard" aria-label="Close" title="Close" className={iconButton}>
               <X className="w-5 h-5" />
             </Link>
-            <UserMenu size="sm" />
-          </div>
-        </div>
-      </nav>
+          </>
+        }
+      />
 
       {/* Split panel */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-8 py-10">

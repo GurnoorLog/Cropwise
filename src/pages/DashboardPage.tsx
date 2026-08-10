@@ -1,19 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Bell,
   Leaf,
   TrendingUp,
   CloudLightning,
   Calendar,
-  Bot,
   Loader2,
 } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { supabase } from "../supabase";
 import { getProfile, getFarmCrops, type Profile } from "../lib/profile";
 import MobileNav from "../components/MobileNav";
-import UserMenu from "../components/UserMenu";
+import AppNav from "../components/AppNav";
 import PricesResult, { type PriceRow } from "../components/results/PricesResult";
 import BuyersResult, { type BuyerRow } from "../components/results/BuyersResult";
 
@@ -51,10 +49,6 @@ export default function DashboardPage() {
     };
   }, [user]);
 
-  const displayName = user?.user_metadata?.full_name
-    ? (user.user_metadata.full_name as string).split(" ")[0]
-    : "Farmer";
-
   const primaryCrop = crops[0] ?? prices[0]?.crop ?? "Tomatoes";
   const best = prices[0];
   const secondBest = prices[1];
@@ -64,8 +58,7 @@ export default function DashboardPage() {
       ? Math.max(0, Math.round(((best.max_price - best.min_price) / best.max_price) * 100))
       : 12;
 
-  const actions = [
-    {
+  const actions = [    {
       icon: CloudLightning,
       iconBg: "bg-amber-50 text-amber-600",
       border: "border-l-amber-400",
@@ -104,9 +97,6 @@ export default function DashboardPage() {
     },
   ];
 
-  const navLink = (active: boolean) =>
-    `text-sm font-medium transition-colors ${active ? "text-white" : "text-white/60 hover:text-white"}`;
-
   return (
     <div className="min-h-screen relative flex flex-col isolate bg-[#171310]">
       {/* Background Video Layer */}
@@ -121,57 +111,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 w-full border-b border-white/10 backdrop-blur-md bg-transparent">
-        <div className="max-w-[1400px] mx-auto px-8 py-5 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <Link to="/dashboard" className="font-serif text-2xl text-white tracking-tight">
-              Harvest Window
-            </Link>
-            <div className="hidden md:flex items-center gap-7">
-              <Link to="/dashboard" className={navLink(true)}>
-                Overview
-              </Link>
-              <Link to="/weather" className={navLink(false)}>
-                Weather
-              </Link>
-              <Link to="/news" className={navLink(false)}>
-                Markets
-              </Link>
-              <Link to="/calendar" className={navLink(false)}>
-                Calendar
-              </Link>
-              <Link to="/schemes" className={navLink(false)}>
-                Schemes
-              </Link>
-              <Link
-                to="/app"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-white/90 hover:scale-105 active:scale-95 transition-all"
-              >
-                <Bot className="w-3.5 h-3.5" />
-                Ask AI Agent
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <button
-              aria-label="Notifications"
-              className="text-white/60 hover:text-white transition-colors cursor-pointer"
-            >
-              <Bell className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-semibold text-white">{displayName}</p>
-                <p className="text-[10px] text-white/40 uppercase tracking-tighter">
-                  {profile?.farm_name ? profile.farm_name : "Premium Estate"}
-                </p>
-              </div>
-              <UserMenu subtitle={profile?.farm_name ?? undefined} />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNav subtitle={profile?.farm_name ?? undefined} />
 
       {/* Main */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-8 py-10">
