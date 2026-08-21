@@ -33,12 +33,20 @@ type AdvisorStep = "idle" | "recording" | "connecting" | "thinking" | "result" |
 
 type AgentState = "listening" | "processing" | "speaking" | "ready";
 
-const SUGGESTIONS = [
-  "Market Prices",
-  "Weather Forecast",
-  "Buyer Opportunities",
-  "Crop Calendar",
-  "MSP & Schemes",
+const SUGGESTIONS_HI = [
+  "आज टमाटर का भाव क्या है?",
+  "कल बारिश होगी?",
+  "सरकारी योजनाएं बताओ",
+  "गेहूं कब बोएं?",
+  "प्याज़ कौन खरीदेगा?",
+] as const;
+
+const SUGGESTIONS_EN = [
+  "What is today's tomato price?",
+  "Will it rain tomorrow?",
+  "Tell me about government schemes",
+  "When should I sow wheat?",
+  "Who will buy my onions?",
 ] as const;
 
 const STATE_LABEL: Record<AgentState, string> = {
@@ -188,7 +196,7 @@ export default function AdvisorPage() {
             const fallback =
               farm?.location && /agra|uttar pradesh/i.test(farm.location)
                 ? { lat: 27.1767, lon: 78.0081 }
-                : { lat: 18.52, lon: 73.85 };
+                : { lat: 20.5937, lon: 78.9629 };
             const weather = await fetchForecast(fallback.lat, fallback.lon);
             weatherRef.current = weather;
             resolve(weather);
@@ -256,9 +264,9 @@ export default function AdvisorPage() {
           language,
           apiKey: aiKey,
           farm,
-          lat: weather?.latitude ?? 18.52,
-          lon: weather?.longitude ?? 73.85,
-          district: farm?.location ?? "Pune",
+          lat: weather?.latitude ?? 20.5937,
+          lon: weather?.longitude ?? 78.9629,
+          district: farm?.location ?? "India",
           history,
         });
 
@@ -515,7 +523,7 @@ export default function AdvisorPage() {
 
             {/* Suggestions */}
             <div className="fade-rise stagger-4 flex flex-wrap gap-2">
-              {SUGGESTIONS.map((s) => (
+              {(t ? SUGGESTIONS_HI : SUGGESTIONS_EN).map((s) => (
                 <button
                   key={s}
                   onClick={() => handleTextSubmit(s)}

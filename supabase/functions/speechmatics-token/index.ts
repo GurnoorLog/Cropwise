@@ -38,8 +38,10 @@ Deno.serve(async (req: Request) => {
     const res = await fetch("https://mp.speechmatics.com/v1/api_keys?type=rt", {
       method: "POST",
       headers: {
-        Authorization: `Basic ${btoa(`${SPEECHMATICS_API_KEY}:`)}`,
+        Authorization: `Bearer ${SPEECHMATICS_API_KEY}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({ ttl: 3600 }),
     });
 
     if (!res.ok) {
@@ -52,11 +54,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const json = await res.json();
-    if (!json?.key) {
+    if (!json?.key_value) {
       return corsResponse({ error: "No token returned from Speechmatics" }, 502);
     }
 
-    return corsResponse({ token: json.key });
+    return corsResponse({ token: json.key_value });
   } catch (err) {
     return corsResponse(
       {

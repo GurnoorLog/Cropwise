@@ -56,26 +56,35 @@ interface MarketPriceRow {
   unit: string | null;
 }
 
+export interface MarketPricesResult {
+  prices: CropPrice[];
+  /** True when prices came from a live sync; false when they are seasonal estimates. */
+  isLive: boolean;
+}
+
 /**
  * Fetch live prices from the `prices-sync` edge function (Agmarknet if a
  * server key is configured, otherwise the baseline table). Falls back to
  * seasonal local data if the network request fails.
  */
-export async function fetchMarketPrices(): Promise<CropPrice[]> {
+export async function fetchMarketPrices(): Promise<MarketPricesResult> {
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/prices-sync`);
     if (!res.ok) throw new Error(`prices-sync ${res.status}`);
     const json = await res.json();
     const rows = (json?.prices ?? []) as MarketPriceRow[];
     if (rows.length === 0) throw new Error("no prices");
-    return rows.map((r) => ({
-      crop: r.crop,
-      nameHi: r.crop_hi ?? r.crop,
-      minPrice: Number(r.min_price),
-      maxPrice: Number(r.max_price),
-      unit: r.unit ?? "₹/kg",
-    }));
+    return {
+      isLive: json?.source === "agmarknet-live",
+      prices: rows.map((r) => ({
+        crop: r.crop,
+        nameHi: r.crop_hi ?? r.crop,
+        minPrice: Number(r.min_price),
+        maxPrice: Number(r.max_price),
+        unit: r.unit ?? "₹/kg",
+      })),
+    };
   } catch {
-    return getAdjustedPrices();
+    return { isLive: false, prices: getAdjustedPrices() };
   }
 }

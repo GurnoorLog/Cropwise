@@ -49,7 +49,7 @@ export default function DashboardPage() {
     };
   }, [user]);
 
-  const primaryCrop = crops[0] ?? prices[0]?.crop ?? "Tomatoes";
+  const primaryCrop = crops[0] ?? prices[0]?.crop ?? "crops";
   const best = prices[0];
   const secondBest = prices[1];
 
@@ -191,7 +191,7 @@ export default function DashboardPage() {
                         {best ? `₹${best.max_price}/kg` : "—"}
                       </div>
                       <p className="text-white/40 text-xs uppercase tracking-widest font-bold">
-                        {best ? `${best.crop} · ${best.market ?? "Pune"}` : "Peak Liquidity Projection"}
+                        {best ? `${best.crop} · ${best.market ?? "nearest mandi"}` : "Peak Liquidity Projection"}
                       </p>
                     </div>
                     <div className="space-y-4 mb-8">

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   useRealtimeTranscription,
   useRealtimeEventListener,
@@ -29,12 +29,41 @@ export function useSpeechmatics({
   const transcriptRef = useRef("");
   const stopRef = useRef<() => Promise<void> | undefined>();
 
-  const { startTranscription, stopTranscription, sendAudio } =
+  const { startTranscription, stopTranscription, sendAudio, socketState } =
     useRealtimeTranscription();
   const { startRecording, stopRecording } = usePCMAudioRecorderContext();
 
-  // Pipe mic audio to Speechmatics
-  usePCMAudioListener(sendAudio);
+  // Speechmatics throws "Socket not ready to receive audio" if audio is sent
+  // before the WebSocket is open. Buffer chunks until the socket is ready.
+  const audioBufferRef = useRef<Float32Array[]>([]);
+  const socketOpenRef = useRef(false);
+  socketOpenRef.current = socketState === "open";
+
+  const flushAudioBuffer = useCallback(() => {
+    if (audioBufferRef.current.length === 0) return;
+    const chunks = audioBufferRef.current.splice(0);
+    for (const chunk of chunks) sendAudio(chunk);
+  }, [sendAudio]);
+
+  const onAudio = useCallback(
+    (audio: Float32Array) => {
+      if (socketOpenRef.current) {
+        flushAudioBuffer();
+        sendAudio(audio);
+      } else {
+        audioBufferRef.current.push(audio);
+      }
+    },
+    [flushAudioBuffer, sendAudio],
+  );
+
+  // Pipe mic audio to Speechmatics (buffered until the socket is open)
+  usePCMAudioListener(onAudio);
+
+  // Flush anything captured while the socket was still connecting
+  useEffect(() => {
+    if (socketState === "open") flushAudioBuffer();
+  }, [socketState, flushAudioBuffer]);
 
   /** Stop all — defined first so it can be referenced by silence timer */
   const stopAll = useCallback(async () => {
@@ -44,6 +73,7 @@ export function useSpeechmatics({
     } catch {
       // Ignore cleanup errors
     }
+    audioBufferRef.current = [];
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     setIsRecording(false);
   }, [stopRecording, stopTranscription]);
@@ -109,6 +139,7 @@ export function useSpeechmatics({
 
   const startAll = useCallback(async () => {
     try {
+      audioBufferRef.current = [];
       setIsRecording(true);
       const token = await getToken();
 

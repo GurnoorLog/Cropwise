@@ -10,7 +10,7 @@ interface RecommendCropBody {
   language?: string;
   location?: { lat?: number; lon?: number; district?: string };
   weather?: { summary?: string } | null;
-  prices?: { summary?: string };
+  prices?: { summary?: string; isLive?: boolean };
   history?: { role: "user" | "agent"; text: string }[];
 }
 
@@ -68,9 +68,10 @@ Deno.serve(async (req: Request) => {
     return corsResponse({ error: "Missing query" }, 400);
   }
 
-  const district = body.location?.district ?? "Pune";
+  const district = body.location?.district ?? "India";
   const weatherSummary = body.weather?.summary ?? "";
   const priceStr = body.prices?.summary ?? "";
+  const priceIsLive = body.prices?.isLive !== false;
   const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
   const preferredLanguage =
     typeof body.language === "string" &&
@@ -85,6 +86,20 @@ Deno.serve(async (req: Request) => {
           .join("\n")}\nUse this to resolve follow-up references (e.g. "and tomorrow?" refers to the last topic).`
       : "";
 
+  const priceNote = !priceIsLive
+    ? `\nNOTE ON PRICES: No live market feed is available, so the prices above are generic seasonal ESTIMATES, not real quotes. Do not present them as actual market prices, do not invent a specific best market, and avoid recommending a specific crop unless the farmer's profile shows they grow it.`
+    : "";
+
+  const hinglishMode =
+    !/[\u0900-\u097F]/.test(query) &&
+    /\b(aaj|kal|kya|kaise|kyun|kitna|kitne|bhaav|bhav|daam|mandi|fasal|kheti|kisan|barish|baarish|beej|kab|kahan|batao|bata|sarkari|yojana|munafa|bechna|bech|paani|pani|nahi|haan)\b/i.test(
+      query,
+    );
+
+  const hinglishNote = hinglishMode
+    ? `\nThe farmer wrote Hindi using English (Roman) letters (Hinglish). REPLY IN HINGLISH: simple everyday Hindi written with English letters, like "Aaj tomato ka bhav Rs 20 per kg hai. Mandi mein demand achhi hai." Do NOT use Devanagari script. This OVERRIDES any strict-language rule below. Set "language" to "hi".`
+    : "";
+
   const prompt = `You are Harvest Window, helping a farmer decide when to sell their crop. Here is the data:
 
 Crop query: ${query}
@@ -92,11 +107,22 @@ Location: ${district}
 Live market prices per kg: ${priceStr || "unavailable"}
 Weather: ${weatherSummary || "weather data unavailable"}${historyBlock}
 Farmer's preferred language: ${preferredLanguage ? LANGUAGE_NAMES[preferredLanguage] : "match whatever language the farmer writes in"}
+${hinglishNote}${priceNote}
+Answer the farmer's ACTUAL question rather than always giving generic selling advice.
+${hinglishMode ? "" : 'LANGUAGE IS STRICT: when a preferred language is given, write weather_summary, price_estimate, recommendation, and follow_up ONLY in that language. For "English" this means plain English script, never Devanagari or Hinglish, regardless of the topic.'}
 
 Return ONLY a JSON object with EXACTLY these 7 keys:
-1. weather_summary — one short line on the weather relevant to selling.
-2. price_estimate — one short line on the current market price picture.
-3. recommendation — 2-3 sentences in plain language answering the user's question and advising when to sell and why.
+1. weather_summary — one short line on the weather relevant to the question.
+2. price_estimate — one short line on the current market price picture, or say "no live price data" when only estimates are available.
+3. recommendation — 2-3 sentences in plain language DIRECTLY answering the farmer's question:
+   - Weather/forecast questions: focus on how the weather affects their crops (irrigation, frost, rain, harvest timing), not on selling.
+   - Schemes/MSP questions: focus on which government scheme or MSP rate applies and how to claim it.
+   - Price questions: when/where to sell based on the given data.
+   - Buyer questions: which buyer opportunities fit their crops.
+   - Calendar questions: sowing/harvest timing.
+   - News questions: how the news affects them.
+   - General chat: one concrete, relevant suggestion.
+   NEVER repeat the same "sell soon" line for different questions.
 4. spoilage_risk — EXACTLY one of "green", "yellow", "red" (weather-driven spoilage risk).
 5. language — the language of the farmer's question, EXACTLY one of "hi", "en", "mr", "bn", "ta", "ur" (Hindi, English, Marathi, Bengali, Tamil, Urdu). Use the farmer's preferred language if the question is not in any local language (e.g. "What is the best time to sell?").
 6. result_type — pick the SINGLE best category for the user's request:
@@ -112,7 +138,7 @@ Return ONLY a JSON object with EXACTLY these 7 keys:
 
 Write weather_summary, price_estimate, recommendation, and follow_up ALL in the language of the farmer's question (or the preferred language).
 Respond with ONLY valid JSON in EXACTLY this shape:
-{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"hi","result_type":"calendar","follow_up":"..."}`;
+{"weather_summary":"...","price_estimate":"...","recommendation":"...","spoilage_risk":"green","language":"en","result_type":"calendar","follow_up":"..."}`;
 
   try {
     const res = await fetch(AI_ENDPOINT, {
@@ -199,6 +225,7 @@ Respond with ONLY valid JSON in EXACTLY this shape:
             : null;
     const language =
       scriptLanguage ??
+      (hinglishMode ? "hi" : null) ??
       preferredLanguage ??
       (parsed.language === "hi" ? "hi" : "en");
 

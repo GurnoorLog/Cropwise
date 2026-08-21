@@ -267,7 +267,7 @@ export default function WeatherResult({
 
         {/* Farming Impact */}
         <div className="fade-rise stagger-4">
-          <div className="weather-card p-8 bg-black text-white h-full">
+          <div className="weather-card p-8 !bg-black !text-white h-full">
             <h2 className="font-serif text-2xl mb-8">Farming Impact</h2>
             <div className="space-y-6">
               <div className="flex justify-between items-start">
@@ -309,9 +309,13 @@ export default function WeatherResult({
                 </div>
                 <CheckCircle className="w-6 h-6 text-green-400" />
               </div>
-              <button className="w-full mt-6 py-4 rounded-xl bg-white text-black text-[10px] font-bold uppercase tracking-[0.2em] transition-all hover:scale-[1.02] cursor-pointer">
+              <Link
+                to="/app"
+                onClick={onViewAdvisory}
+                className="w-full mt-6 py-4 rounded-xl bg-white text-black text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all hover:scale-[1.02] cursor-pointer"
+              >
                 View Full Advisory
-              </button>
+              </Link>
             </div>
           </div>
         </div>

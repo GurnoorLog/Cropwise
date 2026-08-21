@@ -106,6 +106,13 @@ export default function SchemesResult({
           </span>
         </div>
 
+        {schemes.length === 0 ? (
+          <p className="text-sm text-slate-400">
+            {t
+              ? "अभी कोई योजना उपलब्ध नहीं है। कुछ देर बाद फिर देखें।"
+              : "No schemes available yet. Please check back soon."}
+          </p>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {schemes.map((s) => {
             const Icon = ICONS[s.icon ?? ""] ?? HandCoins;
@@ -169,6 +176,7 @@ export default function SchemesResult({
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );

@@ -35,9 +35,10 @@ export function buildPrompt(opts: {
   language: SpeechLanguageCode;
   farm?: FarmContext | null;
   instructions?: string;
+  priceIsLive?: boolean;
   history?: { role: "user" | "agent"; text: string }[];
 }): string {
-  const { query, priceStr, weatherSummary, language, farm, instructions, history } = opts;
+  const { query, priceStr, weatherSummary, language, farm, instructions, priceIsLive, history } = opts;
 
   const historyBlock =
     history && history.length > 0
@@ -62,10 +63,25 @@ Use this profile to personalise every recommendation. Always tie advice to the c
 `
     : "";
 
-  const taskBlock = instructions ?? `Write:
-1. weather_summary — a short one-line summary of the weather relevant to selling.
-2. price_estimate — a short line describing the current market price picture.
-3. recommendation — a 2-3 sentence plain-language recommendation on when to sell and why.
+  const priceNote =
+    priceIsLive === false
+      ? `
+NOTE ON PRICES: No live market feed is available, so the prices above are generic seasonal ESTIMATES, not real quotes. Do not present them as actual market prices. Do not invent a specific best market, and avoid recommending a specific crop unless the farmer's profile shows they grow it.`
+      : "";
+
+  const taskBlock = instructions ?? `Answer the farmer's ACTUAL question (query) rather than always giving generic selling advice.
+Write:
+1. weather_summary — a short one-line summary of the weather relevant to the question.
+2. price_estimate — a short line describing the current market price picture, or say "no live price data" when only estimates are available.
+3. recommendation — a 2-3 sentence plain-language answer DIRECTLY addressing what the farmer asked:
+   - If they asked about weather/forecast: focus on how the weather affects their crops (irrigation, frost, rain, harvest timing), not on selling.
+   - If they asked about schemes/MSP: focus on which government scheme or MSP rate applies to their crops and how to claim it.
+   - If they asked about prices: when/where to sell based on the given data.
+   - If they asked about buyers: which buyer opportunities fit their crops.
+   - If they asked about calendar: sowing/harvest timing for their crops.
+   - If they asked about news: how the news affects them.
+   - General chat: give one concrete, relevant suggestion.
+   NEVER repeat the same "sell soon" line for different questions.
 4. spoilage_risk — "green", "yellow", or "red" based on weather-driven spoilage risk.
 5. language — the language the farmer wrote in, EXACTLY one of "hi", "en", "mr", "bn", "ta", "ur" (Hindi, English, Marathi, Bengali, Tamil, Urdu).
 6. result_type — classify the user's intent as EXACTLY one of: "weather" (forecast/climate), "prices" (market prices), "news" (market news/insights), "buyers" (buyers/mandi opportunities), "calendar" (crop sowing/harvest calendar), "schemes" (MSP/government schemes), or "chat" (general advice or anything else).
@@ -78,6 +94,7 @@ Live market prices per kg: ${priceStr}
 Weather: ${weatherSummary || "weather data unavailable"}
 ${historyBlock}
 ${farmBlock}
+${priceNote}
 Respond in ${languageName(language)}.
 
 ${taskBlock}
@@ -95,9 +112,10 @@ export async function callAIMLDirect(opts: {
   apiKey: string;
   farm?: FarmContext | null;
   instructions?: string;
+  priceIsLive?: boolean;
   history?: { role: "user" | "agent"; text: string }[];
 }): Promise<AIResponse> {
-  const { query, priceStr, weatherSummary, language, apiKey, farm, instructions, history } = opts;
+  const { query, priceStr, weatherSummary, language, apiKey, farm, instructions, priceIsLive, history } = opts;
 
   const res = await fetch(AI_ENDPOINT, {
     method: "POST",
@@ -107,7 +125,7 @@ export async function callAIMLDirect(opts: {
     },
     body: JSON.stringify({
       model: AI_MODEL,
-      messages: [{ role: "user", content: buildPrompt({ query, priceStr, weatherSummary, language, farm, instructions, history }) }],
+      messages: [{ role: "user", content: buildPrompt({ query, priceStr, weatherSummary, language, farm, instructions, priceIsLive, history }) }],
       temperature: 0.6,
     }),
   });
@@ -151,7 +169,7 @@ export async function getAIResponse(opts: {
   history?: { role: "user" | "agent"; text: string }[];
 }): Promise<AIResponse> {
   const { query, weatherSummary, language, apiKey, farm, lat, lon, district, instructions, history } = opts;
-  const prices = await fetchMarketPrices();
+  const { prices, isLive } = await fetchMarketPrices();
   const priceStr = formatPrices(prices);
 
   if (apiKey) {
@@ -163,6 +181,7 @@ export async function getAIResponse(opts: {
       apiKey,
       farm,
       instructions,
+      priceIsLive: isLive,
       history,
     });
   }
@@ -177,7 +196,7 @@ export async function getAIResponse(opts: {
         district: district ?? farm?.location ?? "India",
       },
       weather: weatherSummary ? { summary: weatherSummary } : null,
-      prices: { summary: priceStr },
+      prices: { summary: priceStr, isLive },
       farm,
       history: history ?? [],
     },
@@ -207,7 +226,7 @@ export async function fetchWeatherSummary(
 ): Promise<{ summary: string; lat: number; lon: number }> {
   const coords = location && /agra|uttar pradesh/i.test(location)
     ? { lat: 27.1767, lon: 78.0081 }
-    : { lat: 18.52, lon: 73.85 };
+    : { lat: 20.5937, lon: 78.9629 };
 
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=auto&forecast_days=7`;

@@ -31,7 +31,7 @@ export default function WeatherPage() {
   const lang = user?.user_metadata?.language === "hi" ? "hi" : "en";
 
   return (
-    <div className="min-h-screen relative flex flex-col isolate bg-[#0f172a]">
+    <div className="min-h-screen relative flex flex-col isolate bg-[#171310]">
       {/* Background Video Layer */}
       <div className="fixed inset-0 w-full h-full -z-20 overflow-hidden">
         <video autoPlay muted loop playsInline className="w-full h-full object-cover">
@@ -40,7 +40,7 @@ export default function WeatherPage() {
             type="video/mp4"
           />
         </video>
-        <div className="absolute inset-0 video-overlay-weather -z-10" />
+        <div className="absolute inset-0 video-overlay-dashboard -z-10" />
       </div>
 
       {/* Navigation */}

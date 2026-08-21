@@ -35,6 +35,7 @@ interface PriceRow {
   min_price: number;
   max_price: number;
   unit: string;
+  updated_at: string;
 }
 
 // If DATA_GOV_IN_API_KEY is set, fetch live Agmarknet mandi prices for Pune/Maharashtra.
@@ -89,25 +90,26 @@ Deno.serve(async (req: Request) => {
         }>;
 
         if (records.length > 0) {
-          const prices = records
-            .map((r) => [
-              Number(r.modal_price ?? r.max_price ?? r.min_price ?? 0),
-              Number(r.min_price ?? 0),
-              Number(r.max_price ?? 0),
-            ])
-            .filter((p) => p[0] > 0);
+          // Agmarknet reports Rs per quintal; convert to Rs per kg.
+          // Use the average MODAL (typical) price across mandis as the centre,
+          // then show a realistic +/-15% band instead of a statewide min-max
+          // that mixes the cheapest and priciest markets.
+          const modals = records
+            .map((r) => Number(r.modal_price ?? 0))
+            .filter((v) => v > 0);
 
-          if (prices.length > 0) {
-            const vals = prices.map((p) => p[0]);
-            const minAll = prices.map((p) => p[1]).filter((v) => v > 0);
-            const maxAll = prices.map((p) => p[2]).filter((v) => v > 0);
+          if (modals.length > 0) {
+            const centreKg = Math.round(
+              modals.reduce((a, b) => a + b, 0) / modals.length / 100,
+            );
             rows.push({
               crop,
               crop_hi: HINDI[crop] ?? crop,
-              market: records[0].market ?? "Pune",
-              min_price: Math.round((minAll.length ? Math.min(...minAll) : Math.min(...vals)) / 50) * 50,
-              max_price: Math.round((maxAll.length ? Math.max(...maxAll) : Math.max(...vals)) / 50) * 50,
+              market: (records[0].market ?? "Pune").trim(),
+              min_price: Math.max(1, Math.round(centreKg * 0.85)),
+              max_price: Math.round(centreKg * 1.15),
               unit: "₹/kg",
+              updated_at: new Date().toISOString(),
             });
           }
         }
@@ -116,12 +118,28 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    let upsertError: string | null = null;
     if (rows.length > 0) {
       const { error } = await supabase.from("market_prices").upsert(rows, {
-        onConflict: "crop,market",
+        onConflict: "crop",
       });
-      if (error) console.error("prices upsert error", error.message);
+      if (error) {
+        upsertError = error.message;
+        console.error("prices upsert error", error.message);
+      }
     }
+
+    const { data: prices } = await supabase
+      .from("market_prices")
+      .select("*")
+      .order("crop", { ascending: true });
+
+    return corsResponse({
+      source: rows.length > 0 ? "agmarknet-live" : "baseline",
+      fetched_crops: rows.length,
+      upsert_error: upsertError,
+      prices: prices ?? [],
+    });
   }
 
   const { data: prices } = await supabase
@@ -130,7 +148,8 @@ Deno.serve(async (req: Request) => {
     .order("crop", { ascending: true });
 
   return corsResponse({
-    source: DATA_GOV_IN_KEY ? "agmarknet-live" : "baseline",
+    source: "baseline",
+    fetched_crops: 0,
     prices: prices ?? [],
   });
 });
